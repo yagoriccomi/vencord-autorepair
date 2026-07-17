@@ -94,6 +94,20 @@ Depois é só rodar o menu de novo. 👍
 
 ---
 
+## 📜 Licença
+
+Este projeto usa a **GNU General Public License v3.0** (GPLv3). Resumindo em miúdos: você pode **usar, estudar, mudar e compartilhar** à vontade — só que qualquer versão modificada que você distribuir também precisa ficar aberta sob a mesma licença. O texto completo está no arquivo [`LICENSE`](LICENSE).
+
+```
+Copyright (C) 2026 yagoriccomi
+
+Este programa é software livre: você pode redistribuí-lo e/ou modificá-lo
+sob os termos da GNU General Public License, versão 3, publicada pela
+Free Software Foundation. Sem QUALQUER GARANTIA. Veja o arquivo LICENSE.
+```
+
+---
+
 ## 📄 Aviso
 
 O Vencord é um mod (uma modificação) do Discord. Usar é decisão sua. Este projeto só automatiza colocar um programa **open-source** de volta no **seu próprio** computador. 🙂
