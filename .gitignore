@@ -1,0 +1,6 @@
+# Binario do instalador (baixado na instalacao, verificado por checksum)
+*.exe
+
+# Logs / artefatos de runtime
+*.log
+register-result.txt
