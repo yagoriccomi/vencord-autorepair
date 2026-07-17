@@ -45,6 +45,11 @@ function Reconcile {
 
 if ($Once) { Reconcile; return }
 
+# Instancia unica: encerra qualquer outro vigia que ja esteja rodando.
+Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*vencord-watch.ps1*' -and $_.ProcessId -ne $PID } |
+    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+
 # Estado inicial: NAO aplica nada agora. So registra a linha de base.
 $lastApp    = (Latest-App).Name
 $wasRunning = [bool](Get-Process Discord -ErrorAction SilentlyContinue)
