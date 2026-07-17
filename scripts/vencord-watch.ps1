@@ -60,10 +60,12 @@ function Reconcile {
 
 if ($Once) { Reconcile; return }
 
-# Instancia unica: encerra qualquer outro vigia que ja esteja rodando.
-Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -like '*vencord-watch.ps1*' -and $_.ProcessId -ne $PID } |
-    ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+# Instancia unica via mutex nomeado (nao mata processo nenhum).
+# Se outro vigia ja detem a "chave", este sai imediatamente.
+$script:mtx = New-Object System.Threading.Mutex($false, 'VencordAutoRepairWatcher')
+$owns = $false
+try { $owns = $script:mtx.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $owns = $true }
+if (-not $owns) { Log "Ja existe um vigia rodando - saindo."; return }
 
 # Estado inicial: NAO aplica nada agora. So registra a linha de base.
 $lastApp    = (Latest-App).Name
