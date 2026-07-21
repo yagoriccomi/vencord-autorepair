@@ -77,7 +77,7 @@ Antivírus (tipo o **Kaspersky**) às vezes acha que "um programa que se reinsta
 
 1. Abra o antivírus.
 2. Procure por **Exclusões** / **Aplicativos confiáveis**.
-3. Adicione a pasta `C:\Users\SEU-NOME\Vencord` e o `powershell.exe`.
+3. Adicione a pasta `C:\Users\SEU-NOME\Vencord` e os processos `wscript.exe` e `powershell.exe`.
 
 Depois é só rodar o menu de novo. 👍
 

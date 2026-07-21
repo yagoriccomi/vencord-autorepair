@@ -16,13 +16,16 @@
 #
 # Registra a tarefa agendada que inicia o vigia junto com a sessao do usuario.
 # Sem admin. O vigia NAO patcha no logon; so age quando o Discord atualiza ou e aberto.
-$watch    = "$env:USERPROFILE\Vencord\vencord-watch.ps1"
+$vbs      = "$env:USERPROFILE\Vencord\run-hidden.vbs"
 $taskName = "Vencord Auto-Repair"
 
 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
 
-$action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$watch`""
+# Lanca via wscript + VBS para que o PowerShell rode SEM janela (sem flash de
+# console no logon). O -WindowStyle Hidden sozinho ainda mostra a janela por um
+# instante antes de esconder; o launcher .vbs evita que ela chegue a existir.
+$action = New-ScheduledTaskAction -Execute "wscript.exe" `
+    -Argument "`"$vbs`""
 
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 

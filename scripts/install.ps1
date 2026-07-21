@@ -36,6 +36,7 @@ New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 # Copia os scripts do projeto para a pasta de instalacao
 Copy-Item "$PSScriptRoot\vencord-watch.ps1"  $InstallDir -Force
 Copy-Item "$PSScriptRoot\register-task.ps1"  $InstallDir -Force
+Copy-Item "$PSScriptRoot\run-hidden.vbs"     $InstallDir -Force
 
 # Baixa o instalador se necessario
 if (-not (Test-Path $Exe)) {
