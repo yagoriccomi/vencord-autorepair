@@ -247,6 +247,7 @@ function Repair([string]$motivo, [bool]$forcar) {
         if ($cfg.NotificarSucesso) {
             Show-Box "Vencord Auto-Repair" `
                 ("Vencord aplicado com sucesso!" + [char]10 + [char]10 +
+                 "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
                  "Versao do Discord: $($app.Name)" + [char]10 + [char]10 +
                  "O Discord esta sendo reaberto.") $false 8
         }
@@ -279,6 +280,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     }
 
     $txt = "Nao foi possivel aplicar o Vencord." + [char]10 + [char]10 +
+           "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
            "Versao do Discord: $ver" + [char]10 +
            "Codigo de saida: $code" + [char]10 + [char]10 +
            "Mensagem do instalador:" + [char]10 + $saida.Trim() + [char]10 + [char]10 +
