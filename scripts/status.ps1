@@ -82,6 +82,27 @@ if (Test-Path $stFile) {
     Write-Host "Auto-reparo ...... ativo, sem falhas" -ForegroundColor Green
 }
 
+# ---- Os scripts instalados estao iguais aos desta pasta? ----
+# O vigia roda a COPIA instalada. Se voce atualizou o projeto e nao reinstalou,
+# o que roda automaticamente ainda e a versao antiga (ja nos mordeu uma vez).
+$desatualizados = @()
+foreach ($f in @('vencord-watch.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
+    $orig = Join-Path $PSScriptRoot $f
+    $dest = Join-Path $base $f
+    if (-not (Test-Path $orig)) { continue }
+    if (-not (Test-Path $dest)) { $desatualizados += $f; continue }
+    if ((Get-FileHash $orig -Algorithm SHA256).Hash -ne (Get-FileHash $dest -Algorithm SHA256).Hash) {
+        $desatualizados += $f
+    }
+}
+if ($desatualizados.Count -gt 0) {
+    Write-Host "Versao ........... DESATUALIZADA - o que roda sozinho e mais antigo que esta pasta" -ForegroundColor Red
+    Write-Host "                   ($($desatualizados -join ', '))" -ForegroundColor DarkGray
+    Write-Host "                   rode a opcao [1] do menu para atualizar" -ForegroundColor DarkGray
+} else {
+    Write-Host "Versao ........... instalada igual a desta pasta" -ForegroundColor Green
+}
+
 # ---- Config ----
 Write-Host ""
 if (Test-Path "$base\config.ps1") { & "$base\config.ps1" -Action mostrar }

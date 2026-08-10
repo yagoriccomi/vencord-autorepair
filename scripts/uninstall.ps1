@@ -30,9 +30,11 @@ Stop-ScheduledTask   -TaskName $taskName -ErrorAction SilentlyContinue
 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
 Write-Host "Tarefa agendada removida (auto-reparo desligado)." -ForegroundColor Green
 
-# Encerra o processo do vigia, se estiver rodando
+# Encerra o processo do vigia, se estiver rodando.
+# O -ne $PID evita o script se matar caso rode a partir de um shell cuja
+# propria linha de comando mencione o vigia.
 Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" |
-    Where-Object { $_.CommandLine -like '*vencord-watch.ps1*' } |
+    Where-Object { $_.CommandLine -like '*vencord-watch.ps1*' -and $_.ProcessId -ne $PID } |
     ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 
 if ($RemoveVencord) {

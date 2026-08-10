@@ -35,7 +35,7 @@ echo   --- AJUSTES ---
 echo   [5]  Ligar/desligar aviso quando DER CERTO
 echo   [6]  Ligar/desligar pergunta antes de fechar o Discord
 echo   [7]  Ligar/desligar reabrir o Discord sozinho
-echo   [8]  Destravar auto-reparo (zerar quarentena)
+echo   [8]  Zerar quarentena (voltar a tentar sozinho)
 echo.
 echo   --- MANUTENCAO ---
 echo   [9]  Ver log do vigia
@@ -91,13 +91,8 @@ goto menu
 
 :opendiscord
 echo.
-if exist "%LOCALAPPDATA%\Discord\Update.exe" (
-  start "" "%LOCALAPPDATA%\Discord\Update.exe" --processStart Discord.exe
-  echo Discord aberto.
-) else (
-  echo Discord nao encontrado.
-)
-timeout /t 2 >nul
+%PS% "%SCRIPTS%\open-discord.ps1"
+pause
 goto menu
 
 :cfgsucesso

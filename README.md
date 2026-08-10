@@ -42,6 +42,8 @@ Antes o Discord fechava do nada e dava um susto. Agora **ele te conta o que est�
 | ✅ **Deu certo** | Caixa avisando que o Vencord foi aplicado. Fecha sozinha em 8s. *(dá pra desligar no menu — opção 5)* |
 | ❌ **Deu errado** | Caixa vermelha com **o código e a mensagem exata do erro**. Fica na tela até você clicar OK. **Não dá pra desligar** — falha você sempre precisa saber. |
 
+> 🕒 Toda caixa mostra **data e hora**. Como a de erro fica esperando o clique, isso evita você confundir um aviso esquecido na tela com um problema de agora.
+
 **E o Discord reabre sozinho** depois de aplicar. Se falhar, ele **limpa o Vencord e abre o Discord puro**, para você nunca ficar sem Discord.
 
 ---
@@ -59,7 +61,7 @@ Abra o `menu.bat`, digite o número e dê Enter:
 | **5** | ✅ Liga/desliga o aviso de **sucesso** |
 | **6** | 🔔 Liga/desliga a **pergunta** antes de fechar o Discord |
 | **7** | 🔁 Liga/desliga **reabrir o Discord** sozinho |
-| **8** | 🔓 **Destrava** o auto-reparo (zera a quarentena) |
+| **8** | 🔓 **Zera a quarentena** (faz ele voltar a tentar sozinho) |
 | **9** | 📜 Mostra o diário (log) |
 | **10** | ♻️ Reinstala a tarefa agendada |
 | **11** | 🛑 Desliga o auto-reparo (o Vencord continua) |
@@ -117,6 +119,19 @@ Antivírus (tipo o **Kaspersky**) às vezes acha que "um programa que se reinsta
   - `config.json` — suas opções (as do menu)
   - `state.json` — contador de falhas / quarentena
 - **Não** precisa de administrador. **Não** roda de hora em hora. **Não** aplica nada no login.
+
+### ⚠️ Duas pastas: a do projeto e a instalada
+
+Esta pasta (com o `menu.bat`) é a **fonte**. Ao apertar **1**, os scripts são **copiados** para `C:\Users\SEU-NOME\Vencord`, e é a **cópia** que roda sozinha.
+
+Ou seja: se você **baixar uma versão nova** deste projeto, precisa apertar **1** de novo para valer. Se esquecer, o que roda continua sendo o antigo.
+
+Para não cair nessa, o **status (opção 2)** avisa:
+
+```
+Versao ........... DESATUALIZADA - o que roda sozinho e mais antigo que esta pasta
+                   rode a opcao [1] do menu para atualizar
+```
 
 ### Como ele sabe se o Vencord está aplicado
 
