@@ -103,14 +103,30 @@ function Ask-Proceed($mensagem, $segundos) {
 }
 
 # --------------------------------------------------------------- Discord ----
-# Versao mais nova, comparada como NUMERO (texto quebraria em 1.0.10000)
-# e apenas pastas completas (com Discord.exe), o que ja filtra update pela metade.
+# Uma pasta app-* so conta como versao de verdade se tiver o Discord.exe E um
+# .asar em resources. O updater do Discord copia o Discord.exe ANTES do
+# resources, e um download interrompido deixa a pasta so com os .dll/.exe:
+# sem esta checagem o vigia elegia esse esqueleto como "versao atual", achava
+# que estava quebrada e tentava patchear o que nem existe.
+# Versao comparada como NUMERO (texto quebraria em 1.0.10000).
+function Test-AppCompleto($dir) {
+    (Test-Path (Join-Path $dir 'Discord.exe')) -and
+    ((Test-Path (Join-Path $dir 'resources\app.asar')) -or
+     (Test-Path (Join-Path $dir 'resources\_app.asar')))
+}
+
 function Get-AppDir {
     Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
-        Where-Object { Test-Path (Join-Path $_.FullName 'Discord.exe') } |
+        Where-Object { Test-AppCompleto $_.FullName } |
         Sort-Object @{ Expression = {
             try { [version]($_.Name -replace '^app-', '') } catch { [version]'0.0.0.0' } } } |
         Select-Object -Last 1
+}
+
+# Pastas app-* que existem mas ainda nao terminaram de baixar.
+function Get-AppIncompletos {
+    Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
+        Where-Object { -not (Test-AppCompleto $_.FullName) }
 }
 
 # O Vencord renomeia app.asar -> _app.asar e poe um shim no lugar.
@@ -179,8 +195,13 @@ function Repair([string]$motivo, [bool]$forcar) {
     if (-not (Test-Path $exe))     { Log "Instalador ausente - abortando."; return }
     if (-not (Test-Path $discord)) { Log "Discord nao instalado."; return }
 
+    $incompletos = Get-AppIncompletos
+    if ($incompletos) {
+        Log "Ignorando update incompleto do Discord: $(($incompletos | ForEach-Object { $_.Name }) -join ', ')"
+    }
+
     $app = Get-AppDir
-    if (-not $app) { Log "Nenhuma versao completa do Discord encontrada."; return }
+    if (-not $app) { Log "Nenhuma versao completa do Discord - esperando o download terminar."; return }
     $ver = $app.Name
 
     # Versao nova zera o historico de falhas (quarentena e por versao).
@@ -226,7 +247,11 @@ function Repair([string]$motivo, [bool]$forcar) {
     Log "$ver ($estado): aplicando Vencord... tentativa $($st.Falhas)/$($cfg.MaxTentativas) [$motivo]"
     $saida = & $exe -install -location $discord 2>&1 | Out-String
     $code  = $LASTEXITCODE
-    Log ($saida.Trim())
+    # O instalador imprime icones unicode que viram lixo ilegivel ao serem
+    # capturados ("OØi Failed!"). Como esse texto vai para a caixa de erro,
+    # limpamos para sobrar a mensagem util.
+    $saida = ($saida -replace '[^\x20-\x7E\r\n]', '').Trim()
+    Log $saida
     Log "Instalador retornou $code."
 
     # Confere o resultado de verdade - o exit code sozinho ja mentiu antes.
@@ -257,7 +282,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     # ---------------- falhou: devolver o Discord PURO e avisar ----------------
     Log "FALHA ao aplicar. Limpando o Vencord para devolver o Discord original..."
     $limpeza = & $exe -uninstall -location $discord 2>&1 | Out-String
-    Log ($limpeza.Trim())
+    Log (($limpeza -replace '[^\x20-\x7E\r\n]', '').Trim())
 
     $app     = Get-AppDir
     $estado2 = if ($app) { Get-PatchState $app } else { 'desconhecido' }

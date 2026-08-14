@@ -77,7 +77,10 @@ $code = $LASTEXITCODE
 # Confere de verdade (o exit code sozinho nao basta)
 Start-Sleep -Seconds 2
 $app = Get-ChildItem $Discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
-    Where-Object { Test-Path (Join-Path $_.FullName 'Discord.exe') } |
+    Where-Object {
+        (Test-Path (Join-Path $_.FullName 'Discord.exe')) -and
+        ((Test-Path (Join-Path $_.FullName 'resources\app.asar')) -or
+         (Test-Path (Join-Path $_.FullName 'resources\_app.asar'))) } |
     Sort-Object @{ Expression = { try { [version]($_.Name -replace '^app-', '') } catch { [version]'0.0.0.0' } } } |
     Select-Object -Last 1
 $aplicado = $app -and (Test-Path (Join-Path $app.FullName 'resources\_app.asar'))

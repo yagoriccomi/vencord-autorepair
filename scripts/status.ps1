@@ -22,10 +22,16 @@ Write-Host "== Vencord Auto-Repair :: status ==" -ForegroundColor Cyan
 
 # ---- Discord + patch ----
 if (Test-Path $discord) {
-    $app = Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
-        Where-Object { Test-Path (Join-Path $_.FullName 'Discord.exe') } |
+    # So conta como versao valida se tiver Discord.exe E um .asar: um update
+    # interrompido deixa a pasta so com os .dll/.exe e nao deve ser considerado.
+    $todas = Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue
+    $completa = { param($p)
+        (Test-Path (Join-Path $p 'Discord.exe')) -and
+        ((Test-Path (Join-Path $p 'resources\app.asar')) -or (Test-Path (Join-Path $p 'resources\_app.asar'))) }
+    $app = $todas | Where-Object { & $completa $_.FullName } |
         Sort-Object @{ Expression = { try { [version]($_.Name -replace '^app-', '') } catch { [version]'0.0.0.0' } } } |
         Select-Object -Last 1
+    $incompletas = $todas | Where-Object { -not (& $completa $_.FullName) }
 
     if ($app) {
         Write-Host "Discord .......... instalado ($($app.Name))" -ForegroundColor Green
@@ -37,6 +43,9 @@ if (Test-Path $discord) {
         else                           { Write-Host "Vencord .......... QUEBRADO - falta o app.asar, o Discord nao abre!" -ForegroundColor Red }
     } else {
         Write-Host "Discord .......... pasta existe, mas sem versao completa" -ForegroundColor Yellow
+    }
+    if ($incompletas) {
+        Write-Host "Update pendente .. $(($incompletas | ForEach-Object { $_.Name }) -join ', ') - baixado pela metade, ignorado" -ForegroundColor DarkYellow
     }
 } else {
     Write-Host "Discord .......... nao encontrado" -ForegroundColor Red

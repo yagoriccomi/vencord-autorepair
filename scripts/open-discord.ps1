@@ -44,8 +44,13 @@ if (Test-Path $updater) {
 }
 
 # 2) plano B: executavel da versao mais nova
+# Ignora updates incompletos (so .dll/.exe, sem resources): abrir essa pasta
+# iniciaria um Discord que morre na hora.
 $app = Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
-    Where-Object { Test-Path (Join-Path $_.FullName 'Discord.exe') } |
+    Where-Object {
+        (Test-Path (Join-Path $_.FullName 'Discord.exe')) -and
+        ((Test-Path (Join-Path $_.FullName 'resources\app.asar')) -or
+         (Test-Path (Join-Path $_.FullName 'resources\_app.asar'))) } |
     Sort-Object @{ Expression = { try { [version]($_.Name -replace '^app-', '') } catch { [version]'0.0.0.0' } } } |
     Select-Object -Last 1
 

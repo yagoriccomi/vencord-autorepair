@@ -142,8 +142,22 @@ O Vencord renomeia o `app.asar` do Discord para `_app.asar` e põe o dele no lug
 | `app.asar` + `_app.asar` | ✅ Vencord aplicado |
 | só `app.asar` | ⚪ Discord puro |
 | falta o `app.asar` | ❌ **Quebrado** — o Discord abre e fecha sozinho |
+| pasta só com `.dll` e `.exe` | ⏳ **Update baixado pela metade** — ignorado |
 
 O programa detecta o caso ❌ e conserta.
+
+### ⏳ Updates do Discord baixados pela metade
+
+Às vezes o Discord começa a baixar uma versão nova e **não termina** (você desliga o PC, cai a internet...). Sobra uma pasta com o `Discord.exe` e os `.dll`, mas **sem o `app.asar`**.
+
+Isso **não é problema**: o Discord continua rodando na versão antiga normalmente. O programa reconhece essas pastas e **passa reto** — não tenta aplicar o Vencord nelas. O status mostra assim:
+
+```
+Vencord .......... APLICADO
+Update pendente .. app-1.0.9252 - baixado pela metade, ignorado
+```
+
+Quando o Discord terminar de baixar aquela versão, aí sim o Vencord é aplicado nela automaticamente.
 
 ---
 
