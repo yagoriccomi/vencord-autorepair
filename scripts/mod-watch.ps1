@@ -1,7 +1,8 @@
-# Equicord Auto-Repair - vigia
+# Discord Mod Auto-Repair - vigia
 # Uso particular. Todos os direitos reservados.
 #
-# Reaplica o Equicord APENAS em dois momentos:
+# Mantem aplicado o mod que VOCE escolheu (Vencord ou Equicord, com ou sem um
+# build proprio) e reage APENAS em dois momentos:
 #   1) quando o Discord instala uma nova versao;
 #   2) quando o Discord e ABERTO (transicao de fechado -> aberto).
 # NAO aplica nada ao iniciar/logar e NAO roda em intervalo de tempo.
@@ -14,7 +15,7 @@
 #     as pastas app-* varias vezes durante um update).
 #   - Confere o resultado de verdade (nao confia no exit code) e reconfere
 #     depois de alguns segundos, para pegar o updater desfazendo o patch.
-#   - Se falhar: limpa o Equicord, devolve o Discord PURO e avisa na tela.
+#   - Se falhar: limpa o mod, devolve o Discord PURO e avisa na tela.
 #   - Depois de N falhas na mesma versao entra em QUARENTENA e para de mexer,
 #     para nunca virar um ciclo de fechar/abrir o Discord infinitamente.
 #
@@ -22,9 +23,10 @@
 param([switch]$Once, [switch]$Force)
 
 $ErrorActionPreference = 'SilentlyContinue'
-$base    = "$env:USERPROFILE\EquicordAutoRepair"
+. (Join-Path $PSScriptRoot 'mods.ps1')
+
+$base    = "$env:USERPROFILE\DiscordModAutoRepair"
 $discord = "$env:LOCALAPPDATA\Discord"
-$exe     = "$base\EquilotlCli.exe"
 $log     = "$base\watch.log"
 $cfgFile = "$base\config.json"
 $stFile  = "$base\state.json"
@@ -36,14 +38,15 @@ function Log($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Out-File -F
 # ---------------------------------------------------------------- config ----
 function Get-Config {
     $d = [pscustomobject]@{
-        NotificarSucesso    = $true   # caixa verde de "deu certo" (ligavel no menu)
-        AvisarAntesDeFechar = $true   # pergunta antes de fechar o Discord
-        SegundosAviso       = 8       # tempo do aviso ate seguir sozinho
-        ReabrirDiscord      = $true   # reabre o Discord depois de mexer
-        MaxTentativas       = 3       # falhas na mesma versao ate a quarentena
-        BuildPersonalizado  = ''      # .asar de um build proprio (com userplugins);
-                                      # vazio = usa o build padrao do Equilotl
-        AsarDoMod           = ''      # destino; vazio = %APPDATA%\Equicord\equicord.asar
+        Mod                 = 'equicord' # 'vencord' ou 'equicord'
+        NotificarSucesso    = $true      # caixa verde de "deu certo" (ligavel no menu)
+        AvisarAntesDeFechar = $true      # pergunta antes de fechar o Discord
+        SegundosAviso       = 8          # tempo do aviso ate seguir sozinho
+        ReabrirDiscord      = $true      # reabre o Discord depois de mexer
+        MaxTentativas       = 3          # falhas na mesma versao ate a quarentena
+        BuildPersonalizado  = ''         # .asar de um build proprio (com userplugins);
+                                         # vazio = usa o build padrao do instalador
+        AsarDoMod           = ''         # destino; vazio = o padrao do mod escolhido
     }
     if (Test-Path $cfgFile) {
         try {
@@ -87,7 +90,7 @@ function Show-Box($titulo, $mensagem, $erro, $segundos) {
 function Ask-Proceed($mensagem, $segundos) {
     try {
         $wsh = New-Object -ComObject WScript.Shell
-        $r = $wsh.Popup($mensagem, $segundos, 'Equicord Auto-Repair', 4 + 32)
+        $r = $wsh.Popup($mensagem, $segundos, 'Discord Mod Auto-Repair', 4 + 32)
         return ($r -ne 7)   # 7 = Nao ; 6 = Sim ; -1 = tempo esgotado
     } catch { return $true }
 }
@@ -113,13 +116,12 @@ function Get-AppDir {
         Select-Object -Last 1
 }
 
-# Pastas app-* que existem mas ainda nao terminaram de baixar.
 function Get-AppIncompletos {
     Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
         Where-Object { -not (Test-AppCompleto $_.FullName) }
 }
 
-# O Equicord renomeia app.asar -> _app.asar e poe um shim no lugar.
+# O mod renomeia app.asar -> _app.asar e poe um shim no lugar.
 #   patched = os dois existem | pure = so o app.asar original
 #   broken  = falta o app.asar -> o Discord ABRE E FECHA SOZINHO
 function Get-PatchState($appDir) {
@@ -154,7 +156,6 @@ function Stop-Discord {
 # Reabre o Discord e CONFERE se ele realmente subiu. O Update.exe (Squirrel)
 # as vezes diz "About to launch" e nao sobe nada, entao existe um plano B.
 function Start-Discord {
-    # 1) jeito oficial: pelo Update.exe (preserva o auto-update do Discord)
     if (Test-Path $updater) {
         Start-Process $updater -ArgumentList '--processStart', 'Discord.exe'
         for ($i = 0; $i -lt 12; $i++) {
@@ -163,7 +164,6 @@ function Start-Discord {
         }
         Log "Update.exe nao subiu o Discord - tentando abrir direto."
     }
-    # 2) plano B: executavel da versao mais nova
     $app = Get-AppDir
     if ($app) {
         $bin = Join-Path $app.FullName 'Discord.exe'
@@ -180,63 +180,61 @@ function Start-Discord {
 }
 
 # ------------------------------------------------------ build personalizado ----
-# O Equilotl instala SEMPRE o build padrao do Equicord. Quem compila a propria
-# versao (src/userplugins) perde os plugins proprios a cada reparo, porque o
-# patch passa a apontar para o .asar padrao. Esta funcao devolve o build proprio
-# por cima do padrao, logo depois do patch e antes de reabrir o Discord.
-# O build proprio e o que o Discord esta carregando de fato?
-function Test-CustomBuildAtivo($cfg) {
+# O instalador oficial poe SEMPRE o build padrao do mod. Quem compila a propria
+# versao (src/userplugins, ex.: GoLiveBypass) perde os plugins proprios a cada
+# reparo, porque o patch passa a apontar para o .asar padrao. Estas funcoes
+# conferem e devolvem o build proprio por cima do padrao.
+function Get-AsarDestino($cfg, $info) {
+    $d = [string]$cfg.AsarDoMod
+    if ([string]::IsNullOrWhiteSpace($d)) { return $info.Asar }
+    return $d
+}
+
+function Test-CustomBuildAtivo($cfg, $info) {
     $origem = [string]$cfg.BuildPersonalizado
     if ([string]::IsNullOrWhiteSpace($origem)) { return $true }   # nao usa build proprio
     if (-not (Test-Path $origem))              { return $true }   # sem origem: avisado em Restore
-
-    $destino = [string]$cfg.AsarDoMod
-    if ([string]::IsNullOrWhiteSpace($destino)) {
-        $destino = Join-Path $env:APPDATA 'Equicord\equicord.asar'
-    }
+    $destino = Get-AsarDestino $cfg $info
     if (-not (Test-Path $destino)) { return $false }
     return ((Get-FileHash $origem -Algorithm SHA256).Hash -eq (Get-FileHash $destino -Algorithm SHA256).Hash)
 }
 
-function Restore-CustomBuild($cfg) {
+function Restore-CustomBuild($cfg, $info) {
     $origem = [string]$cfg.BuildPersonalizado
     if ([string]::IsNullOrWhiteSpace($origem)) { return $true }   # desligado: nada a fazer
-
-    $destino = [string]$cfg.AsarDoMod
-    if ([string]::IsNullOrWhiteSpace($destino)) {
-        $destino = Join-Path $env:APPDATA 'Equicord\equicord.asar'
-    }
+    $destino = Get-AsarDestino $cfg $info
 
     if (-not (Test-Path $origem)) {
-        Log "Build personalizado nao encontrado em $origem - ficando com o build padrao."
+        Log "Build proprio nao encontrado em $origem - ficando com o build padrao."
         return $false
     }
-
     try {
         $pasta = Split-Path $destino -Parent
         if (-not (Test-Path $pasta)) { New-Item -ItemType Directory -Force -Path $pasta | Out-Null }
         Copy-Item $origem $destino -Force -ErrorAction Stop
     } catch {
-        Log "Falha ao restaurar o build personalizado: $($_.Exception.Message)"
+        Log "Falha ao restaurar o build proprio: $($_.Exception.Message)"
         return $false
     }
-
     # confere que chegou inteiro (copia truncada = Discord que nao abre)
     $tamOrigem  = (Get-Item $origem).Length
     $tamDestino = if (Test-Path $destino) { (Get-Item $destino).Length } else { -1 }
     if ($tamOrigem -ne $tamDestino) {
-        Log "Build personalizado copiado pela metade ($tamDestino de $tamOrigem bytes)."
+        Log "Build proprio copiado pela metade ($tamDestino de $tamOrigem bytes)."
         return $false
     }
-
-    Log "Build personalizado restaurado ($([math]::Round($tamOrigem / 1MB, 1)) MB)."
+    Log "Build proprio restaurado ($([math]::Round($tamOrigem / 1MB, 1)) MB)."
     return $true
 }
 
 # ---------------------------------------------------------------- reparo ----
 function Repair([string]$motivo, [bool]$forcar) {
-    $cfg = Get-Config
-    if (-not (Test-Path $exe))     { Log "Instalador ausente - abortando."; return }
+    $cfg  = Get-Config
+    $info = Get-ModInfo $cfg.Mod
+    $exe  = Join-Path $base $info.Exe
+    $nome = $info.Nome
+
+    if (-not (Test-Path $exe))     { Log "Instalador do $nome ausente ($exe) - abortando."; return }
     if (-not (Test-Path $discord)) { Log "Discord nao instalado."; return }
 
     $incompletos = Get-AppIncompletos
@@ -254,50 +252,59 @@ function Repair([string]$motivo, [bool]$forcar) {
         $st.Versao = $ver; $st.Falhas = 0; $st.Quarentena = $false; Set-State $st
     }
 
-    $estado = Get-PatchState $app
-    if ($estado -eq 'patched') {
-        # O patch do Discord esta bom. Mas o Equilotl instala SEMPRE o build
-        # padrao, entao os plugins proprios podem ter sido substituidos sem que
-        # o patch mude nada - some em silencio se ninguem conferir.
-        if (Test-CustomBuildAtivo $cfg) {
-            Log "$ver ja com Equicord - nada a fazer. [$motivo]"
+    $estado     = Get-PatchState $app
+    $modNoDisco = Get-ModAplicado $app
+
+    if ($estado -eq 'patched' -and $modNoDisco -eq $info.Id) {
+        # Mod certo aplicado. Mas o instalador poe SEMPRE o build padrao, entao
+        # os plugins proprios podem ter sido substituidos sem que o patch mude
+        # nada - some em silencio se ninguem conferir.
+        if (Test-CustomBuildAtivo $cfg $info) {
+            Log "$ver ja com $nome - nada a fazer. [$motivo]"
             return
         }
 
-        Log "$ver com Equicord, mas o build personalizado NAO esta ativo - repondo. [$motivo]"
+        Log "$ver com $nome, mas o build proprio NAO esta ativo - repondo. [$motivo]"
         if (Get-Process Discord -ErrorAction SilentlyContinue) {
             if ($cfg.AvisarAntesDeFechar) {
-                $aviso = "Seus plugins proprios do Equicord nao estao ativos." + [char]10 + [char]10 +
+                $aviso = "Seus plugins proprios do $nome nao estao ativos." + [char]10 + [char]10 +
                          "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
                          "Repor agora?" + [char]10 +
                          "(Sem resposta, reponho em $($cfg.SegundosAviso)s.)"
                 if (-not (Ask-Proceed $aviso $cfg.SegundosAviso)) {
-                    Log "Usuario adiou a reposicao do build personalizado. [$motivo]"
+                    Log "Usuario adiou a reposicao do build proprio. [$motivo]"
                     return
                 }
             }
             if (-not (Stop-Discord)) { Log "Nao consegui fechar o Discord - adiando a reposicao."; return }
         }
 
-        $reposto = Restore-CustomBuild $cfg
+        $reposto = Restore-CustomBuild $cfg $info
         if ($cfg.ReabrirDiscord) { $null = Start-Discord }
         if ($reposto) {
             if ($cfg.NotificarSucesso) {
-                Show-Box "Equicord Auto-Repair" `
-                    ("Build personalizado restaurado." + [char]10 + [char]10 +
-                     "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 + [char]10 +
+                Show-Box "Discord Mod Auto-Repair" `
+                    ("Build proprio restaurado." + [char]10 + [char]10 +
+                     "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
+                     "Mod: $nome" + [char]10 + [char]10 +
                      "O Discord esta sendo reaberto com os seus plugins.") $false 8
             }
         } else {
-            Show-Box "Equicord Auto-Repair - ATENCAO" `
-                ("Nao consegui restaurar o seu build personalizado." + [char]10 + [char]10 +
+            Show-Box "Discord Mod Auto-Repair - ATENCAO" `
+                ("Nao consegui restaurar o seu build proprio." + [char]10 + [char]10 +
                  "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
                  "Origem: $($cfg.BuildPersonalizado)" + [char]10 + [char]10 +
-                 "O Discord esta com o Equicord padrao, sem os seus plugins.") $true 0
+                 "O Discord esta com o $nome padrao, sem os seus plugins.") $true 0
         }
         return
     }
-    if ($estado -eq 'broken')  { Log "$ver QUEBRADO (app.asar ausente) - o Discord nao abre assim. Vou restaurar." }
+
+    # Daqui pra baixo: precisa (re)aplicar o mod escolhido.
+    if ($estado -eq 'patched' -and $modNoDisco -ne $info.Id) {
+        $outro = if ($modNoDisco) { $modNoDisco } else { 'outro mod' }
+        Log "$ver esta com '$outro', mas voce escolheu $nome - vou trocar. [$motivo]"
+    }
+    if ($estado -eq 'broken') { Log "$ver QUEBRADO (app.asar ausente) - o Discord nao abre assim. Vou restaurar." }
 
     if ($st.Quarentena -and -not $forcar) {
         Log "$ver em quarentena apos $($st.Falhas) falha(s) - nao vou mexer no Discord. [$motivo]"
@@ -307,7 +314,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     # ---- o Discord PRECISA estar fechado (senao o instalador falha) ----
     if (Get-Process Discord -ErrorAction SilentlyContinue) {
         if ($cfg.AvisarAntesDeFechar) {
-            $aviso = "O Equicord precisa ser aplicado no Discord." + [char]10 + [char]10 +
+            $aviso = "O $nome precisa ser aplicado no Discord." + [char]10 + [char]10 +
                      "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
                      "Aplicar agora?" + [char]10 +
                      "(Sem resposta, aplico automaticamente em $($cfg.SegundosAviso)s.)"
@@ -318,9 +325,9 @@ function Repair([string]$motivo, [bool]$forcar) {
         }
         if (-not (Stop-Discord)) {
             Log "Nao consegui fechar o Discord - adiando (nao vou arriscar corromper)."
-            Show-Box "Equicord Auto-Repair - FALHA" `
-                ("Nao consegui fechar o Discord para aplicar o Equicord." + [char]10 + [char]10 +
-                 "Feche o Discord manualmente e use o menu.bat (opcao 3).") $true 0
+            Show-Box "Discord Mod Auto-Repair - FALHA" `
+                ("Nao consegui fechar o Discord para aplicar o $nome." + [char]10 + [char]10 +
+                 "Feche o Discord manualmente e use o menu.bat (opcao 6).") $true 0
             return
         }
     }
@@ -329,7 +336,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     $st.Falhas = [int]$st.Falhas + 1
     Set-State $st
 
-    Log "$ver ($estado): aplicando Equicord... tentativa $($st.Falhas)/$($cfg.MaxTentativas) [$motivo]"
+    Log "$ver ($estado): aplicando $nome... tentativa $($st.Falhas)/$($cfg.MaxTentativas) [$motivo]"
     $saida = & $exe -install -location $discord 2>&1 | Out-String
     $code  = $LASTEXITCODE
     # O instalador imprime icones unicode que viram lixo ilegivel ao serem
@@ -342,41 +349,41 @@ function Repair([string]$motivo, [bool]$forcar) {
     # Confere o resultado de verdade - o exit code sozinho ja mentiu antes.
     Start-Sleep -Seconds 3
     $app = Get-AppDir
-    $ok  = ($app -and (Get-PatchState $app) -eq 'patched')
+    $ok  = ($app -and (Get-PatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
     if ($ok) {
         Start-Sleep -Seconds 12   # o updater do Discord ja desfez o patch aqui
         $app = Get-AppDir
-        $ok  = ($app -and (Get-PatchState $app) -eq 'patched')
+        $ok  = ($app -and (Get-PatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
         if (-not $ok) { Log "O patch foi desfeito logo depois (updater do Discord ainda ativo)." }
     }
 
     if ($ok) {
         $st.Falhas = 0; $st.Quarentena = $false; Set-State $st
-        Log "SUCESSO: Equicord aplicado em $($app.Name)."
+        Log "SUCESSO: $nome aplicado em $($app.Name)."
 
         # Devolve o build proprio ANTES de reabrir: com o Discord fechado o
         # .asar nao esta em uso e a copia nao falha.
-        $buildOk     = Restore-CustomBuild $cfg
+        $buildOk     = Restore-CustomBuild $cfg $info
         $temBuild    = -not [string]::IsNullOrWhiteSpace([string]$cfg.BuildPersonalizado)
         $buildFalhou = ($temBuild -and -not $buildOk)
         $extraBuild  = ''
-        if ($temBuild -and $buildOk) { $extraBuild = [char]10 + "Build personalizado: restaurado." }
+        if ($temBuild -and $buildOk) { $extraBuild = [char]10 + "Build proprio: restaurado." }
 
-        # Perder o build proprio e silencioso demais para passar batido: o
-        # Equicord volta, mas sem os plugins compilados por voce.
+        # Perder o build proprio e silencioso demais para passar batido: o mod
+        # volta, mas sem os plugins compilados por voce.
         if ($buildFalhou) {
-            Show-Box "Equicord Auto-Repair - ATENCAO" `
-                ("O Equicord foi aplicado, mas NAO consegui restaurar o seu build personalizado." + [char]10 + [char]10 +
+            Show-Box "Discord Mod Auto-Repair - ATENCAO" `
+                ("O $nome foi aplicado, mas NAO consegui restaurar o seu build proprio." + [char]10 + [char]10 +
                  "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
                  "Origem: $($cfg.BuildPersonalizado)" + [char]10 + [char]10 +
-                 "O Discord vai abrir com o Equicord padrao - seus plugins proprios nao estarao ativos." + [char]10 +
-                 "Reconstrua o build (menu, opcao 13) e use a opcao 3.") $true 0
+                 "O Discord vai abrir com o $nome padrao - seus plugins proprios nao estarao ativos." + [char]10 +
+                 "Reconstrua o build (menu, opcao 13) e use a opcao 6.") $true 0
         }
 
         if ($cfg.ReabrirDiscord) { $null = Start-Discord }
         if ($cfg.NotificarSucesso -and -not $buildFalhou) {
-            Show-Box "Equicord Auto-Repair" `
-                ("Equicord aplicado com sucesso!" + [char]10 + [char]10 +
+            Show-Box "Discord Mod Auto-Repair" `
+                ("$nome aplicado com sucesso!" + [char]10 + [char]10 +
                  "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
                  "Versao do Discord: $($app.Name)" + $extraBuild + [char]10 + [char]10 +
                  "O Discord esta sendo reaberto.") $false 8
@@ -385,7 +392,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     }
 
     # ---------------- falhou: devolver o Discord PURO e avisar ----------------
-    Log "FALHA ao aplicar. Limpando o Equicord para devolver o Discord original..."
+    Log "FALHA ao aplicar. Limpando o $nome para devolver o Discord original..."
     $limpeza = & $exe -uninstall -location $discord 2>&1 | Out-String
     Log (($limpeza -replace '[^\x20-\x7E\r\n]', '').Trim())
 
@@ -402,22 +409,22 @@ function Repair([string]$motivo, [bool]$forcar) {
         $extra = [char]10 + [char]10 +
                  "O auto-reparo foi PAUSADO nesta versao do Discord depois de $($st.Falhas) tentativas," + [char]10 +
                  "para nao ficar fechando o Discord repetidamente." + [char]10 +
-                 "Quando quiser tentar de novo: menu.bat -> opcao 3."
+                 "Quando quiser tentar de novo: menu.bat -> opcao 6."
     }
     if ($estado2 -eq 'broken') {
         $extra += [char]10 + [char]10 +
                   "ATENCAO: o Discord ficou com arquivos faltando. Reinstale o Discord se ele nao abrir."
     }
 
-    $txt = "Nao foi possivel aplicar o Equicord." + [char]10 + [char]10 +
+    $txt = "Nao foi possivel aplicar o $nome." + [char]10 + [char]10 +
            "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
            "Versao do Discord: $ver" + [char]10 +
            "Codigo de saida: $code" + [char]10 + [char]10 +
            "Mensagem do instalador:" + [char]10 + $saida.Trim() + [char]10 + [char]10 +
-           "O Discord foi restaurado para o original (sem Equicord)" +
+           "O Discord foi restaurado para o original (sem mod)" +
            $(if ($cfg.ReabrirDiscord) { " e reaberto." } else { "." }) + $extra
 
-    Show-Box "Equicord Auto-Repair - FALHA" $txt $true 0
+    Show-Box "Discord Mod Auto-Repair - FALHA" $txt $true 0
 }
 
 # Espera o updater do Discord parar de trocar as pastas app-*.
@@ -437,15 +444,16 @@ function Wait-Settle {
 if ($Once) { Repair 'manual' ([bool]$Force); return }
 
 # Instancia unica via mutex nomeado (nao mata processo nenhum).
-$script:mtx = New-Object System.Threading.Mutex($false, 'EquicordAutoRepairWatcher')
+$script:mtx = New-Object System.Threading.Mutex($false, 'DiscordModAutoRepairWatcher')
 $owns = $false
 try { $owns = $script:mtx.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $owns = $true }
 if (-not $owns) { Log "Ja existe um vigia rodando - saindo."; return }
 
 # Estado inicial: NAO aplica nada agora. So registra a linha de base.
+$cfgIni     = Get-Config
 $lastVer    = (Get-AppDir).Name
 $wasRunning = [bool](Get-Process Discord -ErrorAction SilentlyContinue)
-Log "Vigia iniciado (sem aplicar nada agora). Base: $lastVer, Discord aberto=$wasRunning"
+Log "Vigia iniciado (sem aplicar nada agora). Mod: $(Get-ModRotulo $cfgIni). Base: $lastVer, Discord aberto=$wasRunning"
 
 while ($true) {
     Start-Sleep -Seconds 5

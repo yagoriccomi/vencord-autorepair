@@ -1,7 +1,7 @@
-' Equicord Auto-Repair - launcher invisivel
+' Discord Mod Auto-Repair - launcher invisivel
 ' Uso particular. Todos os direitos reservados.
 '
-' Inicia o vigia (equicord-watch.ps1) SEM nenhuma janela: nem o console do
+' Inicia o vigia (mod-watch.ps1) SEM nenhuma janela: nem o console do
 ' PowerShell, nem flash no logon. O wscript.exe nao tem console proprio e o
 ' terceiro parametro 0 do .Run faz o PowerShell nascer ja com a janela oculta.
 ' (O -WindowStyle Hidden sozinho ainda cria a janela e so depois a esconde,
@@ -9,5 +9,5 @@
 Dim sh, cmd
 Set sh = CreateObject("WScript.Shell")
 cmd = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File """ & _
-      sh.ExpandEnvironmentStrings("%USERPROFILE%") & "\EquicordAutoRepair\equicord-watch.ps1"""
+      sh.ExpandEnvironmentStrings("%USERPROFILE%") & "\DiscordModAutoRepair\mod-watch.ps1"""
 sh.Run cmd, 0, False

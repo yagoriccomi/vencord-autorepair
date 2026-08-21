@@ -1,19 +1,17 @@
-# Equicord Auto-Repair - instalacao completa (sem admin).
+# Discord Mod Auto-Repair - instalacao / troca de mod (sem admin).
 # Uso particular. Todos os direitos reservados.
 #
-# 1) Baixa o Equilotl oficial (com verificacao SHA256)
+# 1) Baixa o instalador oficial do mod escolhido (com verificacao SHA256)
 # 2) Fecha o Discord (obrigatorio: com ele aberto o patch FALHA), aplica e reabre
-# 3) Instala o vigia e registra a tarefa agendada
+# 3) Restaura o build proprio, se houver
+# 4) Instala o vigia e registra a tarefa agendada
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'mods.ps1')
 
-$InstallDir = "$env:USERPROFILE\EquicordAutoRepair"
+$InstallDir = "$env:USERPROFILE\DiscordModAutoRepair"
 $Discord    = "$env:LOCALAPPDATA\Discord"
 $Updater    = "$Discord\Update.exe"
-$Exe        = "$InstallDir\EquilotlCli.exe"
-$Url        = "https://github.com/Equicord/Equilotl/releases/download/v2.2.6/EquilotlCli.exe"
-$Sha256     = "79932382d859747318f642c3e23297c7a0174398cc489e8fb4222cc2758c16e8"
-
-Write-Host "== Equicord Auto-Repair :: instalacao ==" -ForegroundColor Cyan
+$CfgFile    = "$InstallDir\config.json"
 
 if (-not (Test-Path $Discord)) {
     Write-Host "Discord (stable) nao encontrado em %LOCALAPPDATA%\Discord. Instale o Discord primeiro." -ForegroundColor Red
@@ -23,20 +21,31 @@ if (-not (Test-Path $Discord)) {
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
 # Copia os scripts do projeto para a pasta de instalacao
-foreach ($f in @('equicord-watch.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
+foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
     Copy-Item "$PSScriptRoot\$f" $InstallDir -Force
 }
 
+# Le a escolha do mod (o menu grava antes de chamar isto)
+$cfg = $null
+if (Test-Path $CfgFile) { try { $cfg = Get-Content $CfgFile -Raw | ConvertFrom-Json } catch { } }
+$modId    = if ($cfg -and $cfg.Mod) { [string]$cfg.Mod } else { 'equicord' }
+$build    = if ($cfg) { [string]$cfg.BuildPersonalizado } else { '' }
+$info     = Get-ModInfo $modId
+$Exe      = Join-Path $InstallDir $info.Exe
+
+Write-Host "== Discord Mod Auto-Repair :: instalacao ==" -ForegroundColor Cyan
+Write-Host "Mod: $(Get-ModRotulo $cfg)" -ForegroundColor White
+
 # Baixa o instalador se necessario
 if (-not (Test-Path $Exe)) {
-    Write-Host "Baixando EquilotlCli.exe ..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $Url -OutFile $Exe -UseBasicParsing
+    Write-Host "Baixando $($info.Exe) ..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $info.Url -OutFile $Exe -UseBasicParsing
 }
 
 # Verifica integridade
 $hash = (Get-FileHash $Exe -Algorithm SHA256).Hash.ToLower()
-if ($hash -ne $Sha256) {
-    Write-Host "FALHA de checksum! Esperado $Sha256, obtido $hash. Abortando." -ForegroundColor Red
+if ($hash -ne $info.Sha256) {
+    Write-Host "FALHA de checksum! Esperado $($info.Sha256), obtido $hash. Abortando." -ForegroundColor Red
     Remove-Item $Exe -Force
     exit 1
 }
@@ -48,7 +57,7 @@ $estavaAberto = [bool](Get-Process Discord -ErrorAction SilentlyContinue)
 if ($estavaAberto) {
     Write-Host "Fechando o Discord (obrigatorio para aplicar o patch)..." -ForegroundColor Yellow
     Get-Process Discord -ErrorAction SilentlyContinue | ForEach-Object { $null = $_.CloseMainWindow() }
-    for ($i = 0; $i -lt 15; $i++) {
+    for ($i = 0; $i -lt 8; $i++) {
         Start-Sleep -Seconds 1
         if (-not (Get-Process Discord -ErrorAction SilentlyContinue)) { break }
     }
@@ -56,8 +65,8 @@ if ($estavaAberto) {
     Start-Sleep -Seconds 3
 }
 
-# Aplica o Equicord
-Write-Host "Aplicando Equicord no Discord ..." -ForegroundColor Yellow
+# Aplica o mod (se houver outro aplicado, o instalador desfaz antes)
+Write-Host "Aplicando $($info.Nome) no Discord ..." -ForegroundColor Yellow
 & $Exe -install -location $Discord
 $code = $LASTEXITCODE
 
@@ -70,10 +79,30 @@ $app = Get-ChildItem $Discord -Directory -Filter 'app-*' -ErrorAction SilentlyCo
          (Test-Path (Join-Path $_.FullName 'resources\_app.asar'))) } |
     Sort-Object @{ Expression = { try { [version]($_.Name -replace '^app-', '') } catch { [version]'0.0.0.0' } } } |
     Select-Object -Last 1
-$aplicado = $app -and (Test-Path (Join-Path $app.FullName 'resources\_app.asar'))
+
+$aplicado = $app -and (Test-Path (Join-Path $app.FullName 'resources\_app.asar')) -and
+            ((Get-ModAplicado $app) -eq $info.Id)
 
 if ($aplicado) {
-    Write-Host "Equicord aplicado em $($app.Name)." -ForegroundColor Green
+    Write-Host "$($info.Nome) aplicado em $($app.Name)." -ForegroundColor Green
+
+    # Build proprio (ex.: Equicord com o GoLiveBypass compilado)
+    if (-not [string]::IsNullOrWhiteSpace($build)) {
+        $destino = if ($cfg.AsarDoMod) { [string]$cfg.AsarDoMod } else { $info.Asar }
+        if (Test-Path $build) {
+            $pasta = Split-Path $destino -Parent
+            if (-not (Test-Path $pasta)) { New-Item -ItemType Directory -Force -Path $pasta | Out-Null }
+            Copy-Item $build $destino -Force
+            if ((Get-Item $build).Length -eq (Get-Item $destino).Length) {
+                Write-Host "Build proprio restaurado." -ForegroundColor Green
+            } else {
+                Write-Host "Build proprio copiado pela metade!" -ForegroundColor Red
+            }
+        } else {
+            Write-Host "Build proprio nao encontrado em $build - ficando com o build padrao." -ForegroundColor Yellow
+            Write-Host "Use a opcao [13] do menu para gerar o build." -ForegroundColor DarkGray
+        }
+    }
 } else {
     Write-Host "NAO foi possivel aplicar (codigo $code). Restaurando o Discord original..." -ForegroundColor Red
     & $Exe -uninstall -location $Discord
@@ -102,8 +131,8 @@ if ($estavaAberto) {
 
 Write-Host ""
 if ($aplicado) {
-    Write-Host "Concluido! Abra o Discord e procure 'Equicord' nas configuracoes." -ForegroundColor Green
+    Write-Host "Concluido! Abra o Discord e procure '$($info.Nome)' nas configuracoes." -ForegroundColor Green
 } else {
-    Write-Host "Concluido com FALHA na aplicacao do Equicord - o Discord esta intacto." -ForegroundColor Yellow
+    Write-Host "Concluido com FALHA na aplicacao - o Discord esta intacto." -ForegroundColor Yellow
 }
 Write-Host "Arquivos em: $InstallDir" -ForegroundColor DarkGray

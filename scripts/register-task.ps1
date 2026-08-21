@@ -1,12 +1,16 @@
-# Equicord Auto-Repair - registro da tarefa agendada
+# Discord Mod Auto-Repair - registro da tarefa agendada
 # Uso particular. Todos os direitos reservados.
 #
 # Registra a tarefa agendada que inicia o vigia junto com a sessao do usuario.
 # Sem admin. O vigia NAO patcha no logon; so age quando o Discord atualiza ou e aberto.
-$vbs      = "$env:USERPROFILE\EquicordAutoRepair\run-hidden.vbs"
-$taskName = "Equicord Auto-Repair"
+$vbs      = "$env:USERPROFILE\DiscordModAutoRepair\run-hidden.vbs"
+$taskName = "Discord Mod Auto-Repair"
 
-Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
+# Remove a tarefa atual e as de versoes antigas do projeto - senao sobrariam
+# dois vigias rodando, cada um com a sua configuracao.
+foreach ($tn in @($taskName, 'Equicord Auto-Repair', 'Vencord Auto-Repair')) {
+    Unregister-ScheduledTask -TaskName $tn -Confirm:$false -ErrorAction SilentlyContinue
+}
 
 # Lanca via wscript + VBS para que o PowerShell rode SEM janela (sem flash de
 # console no logon). O -WindowStyle Hidden sozinho ainda mostra a janela por um

@@ -1,9 +1,9 @@
-# Equicord Auto-Repair - reconstruir o build personalizado
+# Discord Mod Auto-Repair - reconstruir o build personalizado
 # Uso particular. Todos os direitos reservados.
 #
 # Roda "pnpm build" no projeto do Equicord (aquele com src/userplugins) para
 # regerar o .asar que o auto-reparo restaura depois de cada patch.
-$base    = "$env:USERPROFILE\EquicordAutoRepair"
+$base    = "$env:USERPROFILE\DiscordModAutoRepair"
 $cfgFile = "$base\config.json"
 
 $cfg = $null
