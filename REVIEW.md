@@ -7,7 +7,7 @@
 
 ## 📊 Resumo Executivo
 
-Projeto **maduro em engenharia** e com **um furo de segurança relevante**. Depois da refatoração em camadas e da suíte de 58 testes, a base está coesa, com responsabilidades separadas e as regressões históricas travadas por teste.
+Projeto **maduro em engenharia** e com **um furo de segurança relevante**. Depois da refatoração em camadas e da suíte de testes, a base está coesa, com responsabilidades separadas e as regressões históricas travadas por teste.
 
 O risco real deste software **não é web** — não há query, render, cookie, sessão ou origem. É **execução de binário externo, integridade de arquivos e destruição de dados na máquina do usuário**. A auditoria foi conduzida sobre essa superfície.
 
