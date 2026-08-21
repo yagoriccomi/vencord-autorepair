@@ -42,10 +42,10 @@ if (-not (Test-Path $Exe)) {
     Invoke-WebRequest -Uri $info.Url -OutFile $Exe -UseBasicParsing
 }
 
-# Verifica integridade
-$hash = (Get-FileHash $Exe -Algorithm SHA256).Hash.ToLower()
-if ($hash -ne $info.Sha256) {
-    Write-Host "FALHA de checksum! Esperado $($info.Sha256), obtido $hash. Abortando." -ForegroundColor Red
+# Verifica integridade - mesma funcao que o vigia usa, uma so fonte de verdade
+if (-not (Test-InstaladorConfiavel $Exe $info)) {
+    Write-Host "FALHA de checksum! O arquivo nao confere com a release oficial. Abortando." -ForegroundColor Red
+    Write-Host "Esperado: $($info.Sha256)" -ForegroundColor DarkGray
     Remove-Item $Exe -Force
     exit 1
 }

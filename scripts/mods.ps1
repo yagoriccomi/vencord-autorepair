@@ -36,6 +36,18 @@ function Get-ModInfo([string]$mod) {
     }
 }
 
+# Confere a integridade do instalador ANTES de executa-lo.
+#
+# Precisa ser chamado em TODO caminho de execucao, nao so na instalacao
+# manual: o vigia roda sozinho a cada atualizacao do Discord, a pasta de
+# instalacao e gravavel pelo usuario, e o README orienta exclui-la do
+# antivirus. Sem esta checagem, um .exe trocado ali seria executado
+# automaticamente e de forma recorrente, sem ninguem olhando.
+function Test-InstaladorConfiavel($exe, $info) {
+    if (-not (Test-Path $exe)) { return $false }
+    return ((Get-FileHash $exe -Algorithm SHA256).Hash.ToLower() -eq $info.Sha256)
+}
+
 # Nome curto do que esta escolhido, para mostrar no menu e no status.
 function Get-ModRotulo($cfg) {
     $temBuild = -not [string]::IsNullOrWhiteSpace([string]$cfg.BuildPersonalizado)

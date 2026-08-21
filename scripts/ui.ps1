@@ -24,7 +24,14 @@ function Show-Box($titulo, $mensagem, $erro, $segundos) {
         $tipo = if ($erro) { '1' } else { '0' }
         Start-Process wscript.exe -WindowStyle Hidden -ArgumentList `
             "`"$script:NotifyVbs`"", "`"$arquivo`"", "`"$titulo`"", $tipo, "$segundos"
-    } catch { }
+    } catch {
+        # Engolir esta falha em silencio deixaria o usuario sem NENHUM aviso
+        # justamente no caminho de erro, que e o que o projeto promete sempre
+        # reportar. Registra no log quando houver um.
+        if (Get-Command Log -ErrorAction SilentlyContinue) {
+            Log "Falha ao exibir a caixa de aviso: $($_.Exception.Message)"
+        }
+    }
 }
 
 # Pergunta Sim/Nao com contagem regressiva. Sem resposta = segue em frente,

@@ -97,6 +97,42 @@ Describe 'Get-ModAplicado' {
     }
 }
 
+Describe 'Test-InstaladorConfiavel' {
+    # O vigia executa este binario sozinho, sem supervisao, a cada atualizacao
+    # do Discord - e a pasta e excluida do antivirus por orientacao do README.
+    # A conferencia de integridade e a unica barreira que sobra.
+
+    BeforeEach {
+        $script:ExeFalso = Join-Path $TestDrive 'instalador-teste.exe'
+        Remove-Item $script:ExeFalso -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'recusa quando o arquivo nem existe' {
+        $info = [pscustomobject]@{ Sha256 = '0' * 64 }
+        Test-InstaladorConfiavel (Join-Path $TestDrive 'inexistente.exe') $info | Should -BeFalse
+    }
+
+    It 'recusa quando o conteudo nao bate com o checksum esperado' {
+        Set-Content $script:ExeFalso 'binario adulterado'
+        $info = [pscustomobject]@{ Sha256 = '0' * 64 }
+        Test-InstaladorConfiavel $script:ExeFalso $info | Should -BeFalse
+    }
+
+    It 'aceita quando o checksum confere' {
+        Set-Content $script:ExeFalso 'binario oficial'
+        $info = [pscustomobject]@{ Sha256 = (Get-FileHash $script:ExeFalso -Algorithm SHA256).Hash.ToLower() }
+        Test-InstaladorConfiavel $script:ExeFalso $info | Should -BeTrue
+    }
+
+    It 'detecta troca de UM unico caractere no binario' {
+        Set-Content $script:ExeFalso 'binario oficial'
+        $info = [pscustomobject]@{ Sha256 = (Get-FileHash $script:ExeFalso -Algorithm SHA256).Hash.ToLower() }
+        Set-Content $script:ExeFalso 'binario oficia1'
+
+        Test-InstaladorConfiavel $script:ExeFalso $info | Should -BeFalse
+    }
+}
+
 Describe 'Get-ModRotulo' {
 
     It 'nao oferece build proprio para o Vencord, mesmo se configurado na mao' {

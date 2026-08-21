@@ -39,13 +39,19 @@ if ($RemoveMod) {
 
     # Usa qualquer instalador presente - serve tanto para Vencord quanto Equicord
     $removeu = $false
-    foreach ($nome in @('EquilotlCli.exe', 'VencordInstallerCli.exe')) {
-        $exe = Join-Path $InstallDir $nome
-        if (Test-Path $exe) {
-            Write-Host "Removendo o mod do Discord ($nome) ..." -ForegroundColor Yellow
-            & $exe -uninstall -location $Discord
-            $removeu = $true
+    foreach ($modId in @('equicord', 'vencord')) {
+        $info = Get-ModInfo $modId
+        $exe  = Join-Path $InstallDir $info.Exe
+        if (-not (Test-Path $exe)) { continue }
+
+        # Mesma regra do vigia: nada e executado sem conferir a integridade.
+        if (-not (Test-InstaladorConfiavel $exe $info)) {
+            Write-Host "$($info.Exe) nao confere com o checksum oficial - NAO vou executa-lo." -ForegroundColor Red
+            continue
         }
+        Write-Host "Removendo o mod do Discord ($($info.Exe)) ..." -ForegroundColor Yellow
+        & $exe -uninstall -location $Discord
+        $removeu = $true
     }
     if (-not $removeu) {
         Write-Host "Nenhum instalador encontrado; pulando a remocao do patch." -ForegroundColor DarkYellow

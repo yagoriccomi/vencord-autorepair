@@ -169,6 +169,23 @@ Describe 'Restore-CustomBuild' {
         Restore-CustomBuild $cfg $infoVen | Should -BeTrue
     }
 
+    # --- escrita atomica: a falha NAO pode destruir o build que ja funcionava
+    It 'mantem o build anterior intacto quando a restauracao falha' {
+        Set-Content $script:Destino 'build anterior que funcionava'
+        $cfg = [pscustomobject]@{ BuildPersonalizado = (Join-Path $TestDrive 'origem-sumida.asar'); AsarDoMod = $script:Destino }
+
+        Restore-CustomBuild $cfg $script:InfoEqui | Should -BeFalse
+        (Get-Content $script:Destino -Raw).Trim() | Should -Be 'build anterior que funcionava'
+    }
+
+    It 'nao deixa arquivo temporario para tras depois de restaurar' {
+        Set-Content $script:Origem 'plugins proprios'
+        $cfg = [pscustomobject]@{ BuildPersonalizado = $script:Origem; AsarDoMod = $script:Destino }
+
+        Restore-CustomBuild $cfg $script:InfoEqui | Should -BeTrue
+        Test-Path "$($script:Destino).novo" | Should -BeFalse
+    }
+
     It 'cria a pasta de destino quando ela ainda nao existe' {
         Set-Content $script:Origem 'plugins proprios'
         $destinoNovo = Join-Path $TestDrive 'pasta\que\nao\existe\mod.asar'

@@ -13,7 +13,21 @@ O risco real deste software **não é web** — não há query, render, cookie, 
 
 **O achado que importa:** a verificação SHA256 existe, mas **só no caminho de instalação manual**. O vigia — que roda sozinho, sem supervisão, a cada atualização do Discord — executa o mesmo binário **sem verificar nada**. Isso transforma a pasta de instalação num alvo de persistência: quem conseguir escrever ali ganha execução automática e recorrente.
 
-**Nível de risco atual: MÉDIO-ALTO**, concentrado em 1 item crítico e 2 altos, todos com correção barata.
+**Nível de risco no momento da auditoria: MÉDIO-ALTO**, concentrado em 1 item crítico e 2 altos.
+
+### ✅ Situação após as correções (21/08/2026, mesmo dia)
+
+Todos os achados de Crítico a Baixo foram corrigidos e **verificados na prática**, não só por teste unitário:
+
+| # | Achado | Status | Verificação |
+|:-:|---|:-:|---|
+| 1 | Binário executado sem checksum no caminho automático | **Corrigido** | Adulterei 1 byte do instalador: o vigia **recusou executá-lo** e não tocou no Discord |
+| 2 | Cópia de 16 MB não atômica | **Corrigido** | Temporário + `Move-Item`; teste garante que a falha **preserva** o build anterior |
+| 3 | `SilentlyContinue` global | **Corrigido** | Trocado por `Stop` + falha contida que avisa em vez de engolir |
+| 4 | Sem CI | Em andamento | Etapa 4/5 do roadmap |
+| 5 | Log sem rotação / cabeçalhos defasados | **Corrigido** | Rotação em 1 MB; três cabeçalhos padronizados |
+
+**O que a correção nº 3 revelou de imediato:** ao ligar o `Stop`, o ciclo real quebrou na hora. O PowerShell 5.1 embrulha **cada linha de stderr de um `.exe`** num `ErrorRecord` — e o instalador escreve `INFO Patching...` no stderr. Ou seja, sob `Stop`, um patch **bem-sucedido** virava erro terminante. Resolvido com um executor dedicado (`Invoke-Instalador`) que isola essa captura, deixando o sucesso ser decidido pelo exit code e pela conferência dos arquivos — nunca pelo stream de erro. Suíte: **64 testes**, todos passando.
 
 ### Sobre LGPD — e por que não há achado crítico aqui
 

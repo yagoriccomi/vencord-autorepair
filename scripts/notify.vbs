@@ -1,4 +1,4 @@
-' Equicord Auto-Repair - caixa de mensagem
+' Discord Mod Auto-Repair - caixa de mensagem
 ' Uso particular. Todos os direitos reservados.
 '
 ' Mostra uma caixa de aviso na tela SEM travar o vigia (e lancado como

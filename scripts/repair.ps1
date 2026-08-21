@@ -4,7 +4,12 @@
 # Este arquivo contem SOMENTE definicoes: carrega-lo nao executa nada e nao
 # toca no Discord. E o que permite testar a regra de negocio sem disparar o
 # vigia. O ponto de entrada (mutex + laco de observacao) mora em mod-watch.ps1.
-$ErrorActionPreference = 'SilentlyContinue'
+# 'Stop' de proposito: este codigo fecha o Discord e troca binarios. Erro
+# engolido aqui significa decidir sobre um estado que falhou em silencio - foi
+# assim que o Discord acabou quebrado antes. Os pontos que PODEM falhar
+# legitimamente (config/estado corrompidos, sondagem de processo) tem try/catch
+# ou -ErrorAction proprios, e sao cobertos por teste.
+$ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'mods.ps1')
 . (Join-Path $PSScriptRoot 'discord.ps1')
 . (Join-Path $PSScriptRoot 'ui.ps1')
@@ -15,7 +20,19 @@ $log     = "$base\watch.log"
 $cfgFile = "$base\config.json"
 $stFile  = "$base\state.json"
 
-function Log($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Out-File -FilePath $log -Append -Encoding utf8 }
+$script:LogMaxBytes = 1MB
+
+# Rotaciona antes de escrever: o vigia registra desde o logon, a cada abertura
+# do Discord e a cada atualizacao - sem limite, o arquivo cresceria para sempre
+# e ficaria inutil justamente para diagnosticar.
+function Log($m) {
+    try {
+        if ((Test-Path $log) -and (Get-Item $log).Length -gt $script:LogMaxBytes) {
+            Move-Item $log "$log.1" -Force -ErrorAction SilentlyContinue
+        }
+    } catch { }
+    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Out-File -FilePath $log -Append -Encoding utf8
+}
 
 # A camada de acesso ao Discord nao conhece o nosso log: recebe este
 # scriptblock injetado e reporta por ele [#20][#21].
@@ -94,21 +111,37 @@ function Restore-CustomBuild($cfg, $info) {
         Log "Build proprio nao encontrado em $origem - ficando com o build padrao."
         return $false
     }
+    # Escrita ATOMICA: copia para um temporario, confere o tamanho e so entao
+    # promove por rename (atomico no mesmo volume).
+    #
+    # Copiar 16MB direto sobre o .asar vivo abre uma janela em que uma
+    # interrupcao (queda de energia, disco cheio, antivirus travando o arquivo)
+    # deixa o destino truncado e o Discord sem abrir - exatamente o sintoma que
+    # este projeto existe para evitar. Conferir depois de copiar por cima so
+    # detecta o estrago; nao evita.
+    $temp = "$destino.novo"
+    $tamOrigem = 0
     try {
         $pasta = Split-Path $destino -Parent
         if (-not (Test-Path $pasta)) { New-Item -ItemType Directory -Force -Path $pasta | Out-Null }
-        Copy-Item $origem $destino -Force -ErrorAction Stop
+
+        Copy-Item $origem $temp -Force -ErrorAction Stop
+
+        $tamOrigem = (Get-Item $origem).Length
+        $tamTemp   = (Get-Item $temp).Length
+        if ($tamOrigem -ne $tamTemp) {
+            Log "Build proprio copiado pela metade ($tamTemp de $tamOrigem bytes) - descartando o temporario e mantendo o build atual."
+            Remove-Item $temp -Force -ErrorAction SilentlyContinue
+            return $false
+        }
+
+        Move-Item $temp $destino -Force -ErrorAction Stop
     } catch {
         Log "Falha ao restaurar o build proprio: $($_.Exception.Message)"
+        Remove-Item $temp -Force -ErrorAction SilentlyContinue
         return $false
     }
-    # confere que chegou inteiro (copia truncada = Discord que nao abre)
-    $tamOrigem  = (Get-Item $origem).Length
-    $tamDestino = if (Test-Path $destino) { (Get-Item $destino).Length } else { -1 }
-    if ($tamOrigem -ne $tamDestino) {
-        Log "Build proprio copiado pela metade ($tamDestino de $tamOrigem bytes)."
-        return $false
-    }
+
     Log "Build proprio restaurado ($([math]::Round($tamOrigem / 1MB, 1)) MB)."
     return $true
 }
@@ -139,6 +172,27 @@ function Test-ModAplicadoOk($info) {
     return ($app -and (Get-DiscordPatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
 }
 
+# Executa o instalador e captura saida + codigo de retorno.
+#
+# O 2>&1 PRECISA rodar com 'Continue': o PowerShell 5.1 embrulha CADA linha de
+# stderr de um .exe num ErrorRecord, e sob 'Stop' isso vira erro terminante
+# mesmo quando o instalador apenas escreveu "INFO Patching..." e teve sucesso.
+# O resultado real e decidido pelo exit code e pela conferencia dos ARQUIVOS -
+# nunca pelo stream de erro.
+function Invoke-Instalador($exe, [string[]]$argumentos) {
+    $anterior = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        $saida = & $exe @argumentos 2>&1 | Out-String
+        return [pscustomobject]@{
+            Codigo = $LASTEXITCODE
+            # Os icones unicode do instalador viram lixo ilegivel na captura
+            # ("OOi Failed!") e esse texto vai para a caixa de erro do usuario.
+            Saida  = ($saida -replace '[^\x20-\x7E\r\n]', '').Trim()
+        }
+    } finally { $ErrorActionPreference = $anterior }
+}
+
 $script:NomeMutexOperacao = 'DiscordModAutoRepairOperacao'
 
 # Serializa QUALQUER reparo, venha do vigia ou do menu (-Once).
@@ -167,7 +221,22 @@ function Invoke-ComTravaDeOperacao([scriptblock]$Acao) {
 }
 
 function Repair([string]$motivo, [bool]$forcar) {
-    Invoke-ComTravaDeOperacao { Invoke-Repair $motivo $forcar }
+    Invoke-ComTravaDeOperacao {
+        # Falha ALTA mas CONTIDA: um erro inesperado precisa aparecer (nao ser
+        # engolido), sem derrubar o vigia - que precisa continuar vivo para a
+        # proxima atualizacao do Discord.
+        try {
+            Invoke-Repair $motivo $forcar
+        } catch {
+            Log "ERRO INESPERADO no reparo: $($_.Exception.Message)"
+            Log $_.ScriptStackTrace
+            Show-Erro "$script:TituloApp - ERRO" `
+                ("O auto-reparo encontrou um erro inesperado e parou por seguranca." + [char]10 + [char]10 +
+                 "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
+                 "Erro: $($_.Exception.Message)" + [char]10 + [char]10 +
+                 "Confira o Discord e o log (menu, opcao 12).")
+        }
+    }
 }
 
 function Invoke-Repair([string]$motivo, [bool]$forcar) {
@@ -176,7 +245,22 @@ function Invoke-Repair([string]$motivo, [bool]$forcar) {
     $exe  = Join-Path $base $info.Exe
     $nome = $info.Nome
 
-    if (-not (Test-Path $exe))     { Log "Instalador do $nome ausente ($exe) - abortando."; return }
+    if (-not (Test-Path $exe)) { Log "Instalador do $nome ausente ($exe) - abortando."; return }
+
+    # Integridade conferida a CADA execucao, nao so na instalacao: este codigo
+    # roda sozinho e sem supervisao. Checksum divergente e exatamente o que o
+    # usuario precisa saber, entao avisa na tela em vez de so registrar.
+    if (-not (Test-InstaladorConfiavel $exe $info)) {
+        Log "ABORTADO: o instalador em $exe nao confere com o checksum oficial."
+        Show-Erro "$script:TituloApp - INSTALADOR SUSPEITO" `
+            ("O instalador do $nome nao confere com o checksum oficial." + [char]10 + [char]10 +
+             "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
+             "Arquivo: $exe" + [char]10 + [char]10 +
+             "Nada foi executado e o Discord nao foi tocado." + [char]10 +
+             "Apague esse arquivo e reinstale pelo menu (opcao 4).")
+        return
+    }
+
     if (-not (Test-Path $discord)) { Log "Discord nao instalado."; return }
 
     $incompletos = Get-DiscordAppsIncompletos
@@ -269,12 +353,9 @@ function Invoke-Repair([string]$motivo, [bool]$forcar) {
     Set-State $st
 
     Log "$ver ($estado): aplicando $nome... tentativa $($st.Falhas)/$($cfg.MaxTentativas) [$motivo]"
-    $saida = & $exe -install -location $discord 2>&1 | Out-String
-    $code  = $LASTEXITCODE
-    # O instalador imprime icones unicode que viram lixo ilegivel ao serem
-    # capturados ("OØi Failed!"). Como esse texto vai para a caixa de erro,
-    # limpamos para sobrar a mensagem util.
-    $saida = ($saida -replace '[^\x20-\x7E\r\n]', '').Trim()
+    $execucao = Invoke-Instalador $exe @('-install', '-location', $discord)
+    $saida = $execucao.Saida
+    $code  = $execucao.Codigo
     Log $saida
     Log "Instalador retornou $code."
 
@@ -325,8 +406,7 @@ function Invoke-Repair([string]$motivo, [bool]$forcar) {
 
     # ---------------- falhou: devolver o Discord PURO e avisar ----------------
     Log "FALHA ao aplicar. Limpando o $nome para devolver o Discord original..."
-    $limpeza = & $exe -uninstall -location $discord 2>&1 | Out-String
-    Log (($limpeza -replace '[^\x20-\x7E\r\n]', '').Trim())
+    Log (Invoke-Instalador $exe @('-uninstall', '-location', $discord)).Saida
 
     $app     = Get-DiscordAppDir
     $estado2 = if ($app) { Get-DiscordPatchState $app } else { 'desconhecido' }
