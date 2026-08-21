@@ -7,3 +7,6 @@ register-result.txt
 
 # Lixo de redirecionamento de shell mal formado (ja aconteceu 2x)
 * param(*
+
+# Artefatos de sessao/ferramenta
+.claude/

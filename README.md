@@ -62,6 +62,7 @@ Pronto! 🎉  *(Você precisa já ter o **Discord** instalado.)*
 | **14** | ♻️ Reinstala a tarefa agendada |
 | **15** | 🛑 Desliga o auto-reparo (o mod continua) |
 | **16** | 🗑️ Apaga tudo |
+| **17** | 🧪 Roda os testes (confere se tudo continua funcionando) |
 
 ---
 
@@ -160,6 +161,39 @@ O mod renomeia o `app.asar` do Discord para `_app.asar` e põe um atalho no luga
 ### ⚠️ Duas pastas
 
 Esta pasta (com o `menu.bat`) é a **fonte**. A opção **[4]** copia os scripts para `C:\Users\SEU-NOME\DiscordModAutoRepair`, e é a **cópia** que roda sozinha. Baixou versão nova do projeto? Rode a **[4]** de novo. O status avisa se estiver desatualizado.
+
+---
+
+## 🧪 Tem rede de segurança
+
+O programa mexe em coisa séria: fecha o seu Discord e troca arquivos de 16 MB
+dentro dele. Por isso existe uma **suíte de 64 testes** que confere se tudo
+continua funcionando — inclusive os problemas que já deram errado de verdade
+(update baixado pela metade, plugins sumindo em silêncio, instalador
+adulterado).
+
+Rode quando quiser, pela opção **[17]** do menu:
+
+```
+Todos os 64 testes passaram.
+```
+
+Eles são seguros: rodam contra um **Discord de mentira** numa pasta temporária.
+Nenhum teste fecha o seu Discord nem executa instalador de verdade.
+
+---
+
+## 🛠️ Vai mexer no código?
+
+Leia antes:
+
+- **[`CLAUDE.md`](CLAUDE.md)** — as regras que **não** devem ser "simplificadas".
+  Cada uma nasceu de um Discord quebrado de verdade.
+- **[`docs/arquitetura.md`](docs/arquitetura.md)** — como o sistema pensa, o
+  fluxo de um reparo e o porquê de cada trava.
+- **[`REVIEW.md`](REVIEW.md)** — auditoria de segurança e o que foi corrigido.
+
+Toda alteração passa por lint e testes automaticamente no GitHub Actions.
 
 ---
 
