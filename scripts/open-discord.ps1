@@ -1,4 +1,4 @@
-# Vencord Auto-Repair - abrir o Discord
+# Equicord Auto-Repair - abrir o Discord
 # Copyright (C) 2026 yagoriccomi
 #
 # This program is free software: you can redistribute it and/or modify

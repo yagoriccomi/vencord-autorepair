@@ -1,4 +1,4 @@
-# Vencord Auto-Repair - instalacao completa (sem admin).
+# Equicord Auto-Repair - instalacao completa (sem admin).
 # Copyright (C) 2026 yagoriccomi
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,19 +14,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# 1) Baixa o VencordInstallerCli oficial (com verificacao SHA256)
+# 1) Baixa o Equilotl oficial (com verificacao SHA256)
 # 2) Fecha o Discord (obrigatorio: com ele aberto o patch FALHA), aplica e reabre
 # 3) Instala o vigia e registra a tarefa agendada
 $ErrorActionPreference = 'Stop'
 
-$InstallDir = "$env:USERPROFILE\Vencord"
+$InstallDir = "$env:USERPROFILE\EquicordAutoRepair"
 $Discord    = "$env:LOCALAPPDATA\Discord"
 $Updater    = "$Discord\Update.exe"
-$Exe        = "$InstallDir\VencordInstallerCli.exe"
-$Url        = "https://github.com/Vencord/Installer/releases/download/v1.4.0/VencordInstallerCli.exe"
-$Sha256     = "466d2a0be1f380ddffed052df3cc132125fa34dc1af29312e14f13f358c8d2a2"
+$Exe        = "$InstallDir\EquilotlCli.exe"
+$Url        = "https://github.com/Equicord/Equilotl/releases/download/v2.2.6/EquilotlCli.exe"
+$Sha256     = "79932382d859747318f642c3e23297c7a0174398cc489e8fb4222cc2758c16e8"
 
-Write-Host "== Vencord Auto-Repair :: instalacao ==" -ForegroundColor Cyan
+Write-Host "== Equicord Auto-Repair :: instalacao ==" -ForegroundColor Cyan
 
 if (-not (Test-Path $Discord)) {
     Write-Host "Discord (stable) nao encontrado em %LOCALAPPDATA%\Discord. Instale o Discord primeiro." -ForegroundColor Red
@@ -36,13 +36,13 @@ if (-not (Test-Path $Discord)) {
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
 # Copia os scripts do projeto para a pasta de instalacao
-foreach ($f in @('vencord-watch.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
+foreach ($f in @('equicord-watch.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
     Copy-Item "$PSScriptRoot\$f" $InstallDir -Force
 }
 
 # Baixa o instalador se necessario
 if (-not (Test-Path $Exe)) {
-    Write-Host "Baixando VencordInstallerCli.exe ..." -ForegroundColor Yellow
+    Write-Host "Baixando EquilotlCli.exe ..." -ForegroundColor Yellow
     Invoke-WebRequest -Uri $Url -OutFile $Exe -UseBasicParsing
 }
 
@@ -69,8 +69,8 @@ if ($estavaAberto) {
     Start-Sleep -Seconds 3
 }
 
-# Aplica o Vencord
-Write-Host "Aplicando Vencord no Discord ..." -ForegroundColor Yellow
+# Aplica o Equicord
+Write-Host "Aplicando Equicord no Discord ..." -ForegroundColor Yellow
 & $Exe -install -location $Discord
 $code = $LASTEXITCODE
 
@@ -86,7 +86,7 @@ $app = Get-ChildItem $Discord -Directory -Filter 'app-*' -ErrorAction SilentlyCo
 $aplicado = $app -and (Test-Path (Join-Path $app.FullName 'resources\_app.asar'))
 
 if ($aplicado) {
-    Write-Host "Vencord aplicado em $($app.Name)." -ForegroundColor Green
+    Write-Host "Equicord aplicado em $($app.Name)." -ForegroundColor Green
 } else {
     Write-Host "NAO foi possivel aplicar (codigo $code). Restaurando o Discord original..." -ForegroundColor Red
     & $Exe -uninstall -location $Discord
@@ -115,8 +115,8 @@ if ($estavaAberto) {
 
 Write-Host ""
 if ($aplicado) {
-    Write-Host "Concluido! Abra o Discord e procure 'Vencord' nas configuracoes." -ForegroundColor Green
+    Write-Host "Concluido! Abra o Discord e procure 'Equicord' nas configuracoes." -ForegroundColor Green
 } else {
-    Write-Host "Concluido com FALHA na aplicacao do Vencord - o Discord esta intacto." -ForegroundColor Yellow
+    Write-Host "Concluido com FALHA na aplicacao do Equicord - o Discord esta intacto." -ForegroundColor Yellow
 }
 Write-Host "Arquivos em: $InstallDir" -ForegroundColor DarkGray

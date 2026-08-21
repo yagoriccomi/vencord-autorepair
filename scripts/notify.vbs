@@ -1,4 +1,4 @@
-' Vencord Auto-Repair - caixa de mensagem
+' Equicord Auto-Repair - caixa de mensagem
 ' Copyright (C) 2026 yagoriccomi
 '
 ' This program is free software: you can redistribute it and/or modify

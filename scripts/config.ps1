@@ -1,4 +1,4 @@
-# Vencord Auto-Repair - configuracao
+# Equicord Auto-Repair - configuracao
 # Copyright (C) 2026 yagoriccomi
 #
 # This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 # Le e altera as opcoes do auto-reparo (usado pelo menu.bat).
 param([ValidateSet('mostrar', 'sucesso', 'aviso', 'reabrir', 'resetar')][string]$Action = 'mostrar')
 
-$base    = "$env:USERPROFILE\Vencord"
+$base    = "$env:USERPROFILE\EquicordAutoRepair"
 $cfgFile = "$base\config.json"
 $stFile  = "$base\state.json"
 

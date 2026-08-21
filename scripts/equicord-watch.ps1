@@ -1,4 +1,4 @@
-# Vencord Auto-Repair - vigia
+# Equicord Auto-Repair - vigia
 # Copyright (C) 2026 yagoriccomi
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Reaplica o Vencord APENAS em dois momentos:
+# Reaplica o Equicord APENAS em dois momentos:
 #   1) quando o Discord instala uma nova versao;
 #   2) quando o Discord e ABERTO (transicao de fechado -> aberto).
 # NAO aplica nada ao iniciar/logar e NAO roda em intervalo de tempo.
@@ -27,7 +27,7 @@
 #     as pastas app-* varias vezes durante um update).
 #   - Confere o resultado de verdade (nao confia no exit code) e reconfere
 #     depois de alguns segundos, para pegar o updater desfazendo o patch.
-#   - Se falhar: limpa o Vencord, devolve o Discord PURO e avisa na tela.
+#   - Se falhar: limpa o Equicord, devolve o Discord PURO e avisa na tela.
 #   - Depois de N falhas na mesma versao entra em QUARENTENA e para de mexer,
 #     para nunca virar um ciclo de fechar/abrir o Discord infinitamente.
 #
@@ -35,9 +35,9 @@
 param([switch]$Once, [switch]$Force)
 
 $ErrorActionPreference = 'SilentlyContinue'
-$base    = "$env:USERPROFILE\Vencord"
+$base    = "$env:USERPROFILE\EquicordAutoRepair"
 $discord = "$env:LOCALAPPDATA\Discord"
-$exe     = "$base\VencordInstallerCli.exe"
+$exe     = "$base\EquilotlCli.exe"
 $log     = "$base\watch.log"
 $cfgFile = "$base\config.json"
 $stFile  = "$base\state.json"
@@ -97,7 +97,7 @@ function Show-Box($titulo, $mensagem, $erro, $segundos) {
 function Ask-Proceed($mensagem, $segundos) {
     try {
         $wsh = New-Object -ComObject WScript.Shell
-        $r = $wsh.Popup($mensagem, $segundos, 'Vencord Auto-Repair', 4 + 32)
+        $r = $wsh.Popup($mensagem, $segundos, 'Equicord Auto-Repair', 4 + 32)
         return ($r -ne 7)   # 7 = Nao ; 6 = Sim ; -1 = tempo esgotado
     } catch { return $true }
 }
@@ -129,7 +129,7 @@ function Get-AppIncompletos {
         Where-Object { -not (Test-AppCompleto $_.FullName) }
 }
 
-# O Vencord renomeia app.asar -> _app.asar e poe um shim no lugar.
+# O Equicord renomeia app.asar -> _app.asar e poe um shim no lugar.
 #   patched = os dois existem | pure = so o app.asar original
 #   broken  = falta o app.asar -> o Discord ABRE E FECHA SOZINHO
 function Get-PatchState($appDir) {
@@ -211,7 +211,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     }
 
     $estado = Get-PatchState $app
-    if ($estado -eq 'patched') { Log "$ver ja com Vencord - nada a fazer. [$motivo]"; return }
+    if ($estado -eq 'patched') { Log "$ver ja com Equicord - nada a fazer. [$motivo]"; return }
     if ($estado -eq 'broken')  { Log "$ver QUEBRADO (app.asar ausente) - o Discord nao abre assim. Vou restaurar." }
 
     if ($st.Quarentena -and -not $forcar) {
@@ -222,7 +222,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     # ---- o Discord PRECISA estar fechado (senao o instalador falha) ----
     if (Get-Process Discord -ErrorAction SilentlyContinue) {
         if ($cfg.AvisarAntesDeFechar) {
-            $aviso = "O Vencord precisa ser aplicado no Discord." + [char]10 + [char]10 +
+            $aviso = "O Equicord precisa ser aplicado no Discord." + [char]10 + [char]10 +
                      "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
                      "Aplicar agora?" + [char]10 +
                      "(Sem resposta, aplico automaticamente em $($cfg.SegundosAviso)s.)"
@@ -233,8 +233,8 @@ function Repair([string]$motivo, [bool]$forcar) {
         }
         if (-not (Stop-Discord)) {
             Log "Nao consegui fechar o Discord - adiando (nao vou arriscar corromper)."
-            Show-Box "Vencord Auto-Repair - FALHA" `
-                ("Nao consegui fechar o Discord para aplicar o Vencord." + [char]10 + [char]10 +
+            Show-Box "Equicord Auto-Repair - FALHA" `
+                ("Nao consegui fechar o Discord para aplicar o Equicord." + [char]10 + [char]10 +
                  "Feche o Discord manualmente e use o menu.bat (opcao 3).") $true 0
             return
         }
@@ -244,7 +244,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     $st.Falhas = [int]$st.Falhas + 1
     Set-State $st
 
-    Log "$ver ($estado): aplicando Vencord... tentativa $($st.Falhas)/$($cfg.MaxTentativas) [$motivo]"
+    Log "$ver ($estado): aplicando Equicord... tentativa $($st.Falhas)/$($cfg.MaxTentativas) [$motivo]"
     $saida = & $exe -install -location $discord 2>&1 | Out-String
     $code  = $LASTEXITCODE
     # O instalador imprime icones unicode que viram lixo ilegivel ao serem
@@ -267,11 +267,11 @@ function Repair([string]$motivo, [bool]$forcar) {
 
     if ($ok) {
         $st.Falhas = 0; $st.Quarentena = $false; Set-State $st
-        Log "SUCESSO: Vencord aplicado em $($app.Name)."
+        Log "SUCESSO: Equicord aplicado em $($app.Name)."
         if ($cfg.ReabrirDiscord) { $null = Start-Discord }
         if ($cfg.NotificarSucesso) {
-            Show-Box "Vencord Auto-Repair" `
-                ("Vencord aplicado com sucesso!" + [char]10 + [char]10 +
+            Show-Box "Equicord Auto-Repair" `
+                ("Equicord aplicado com sucesso!" + [char]10 + [char]10 +
                  "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
                  "Versao do Discord: $($app.Name)" + [char]10 + [char]10 +
                  "O Discord esta sendo reaberto.") $false 8
@@ -280,7 +280,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     }
 
     # ---------------- falhou: devolver o Discord PURO e avisar ----------------
-    Log "FALHA ao aplicar. Limpando o Vencord para devolver o Discord original..."
+    Log "FALHA ao aplicar. Limpando o Equicord para devolver o Discord original..."
     $limpeza = & $exe -uninstall -location $discord 2>&1 | Out-String
     Log (($limpeza -replace '[^\x20-\x7E\r\n]', '').Trim())
 
@@ -304,15 +304,15 @@ function Repair([string]$motivo, [bool]$forcar) {
                   "ATENCAO: o Discord ficou com arquivos faltando. Reinstale o Discord se ele nao abrir."
     }
 
-    $txt = "Nao foi possivel aplicar o Vencord." + [char]10 + [char]10 +
+    $txt = "Nao foi possivel aplicar o Equicord." + [char]10 + [char]10 +
            "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
            "Versao do Discord: $ver" + [char]10 +
            "Codigo de saida: $code" + [char]10 + [char]10 +
            "Mensagem do instalador:" + [char]10 + $saida.Trim() + [char]10 + [char]10 +
-           "O Discord foi restaurado para o original (sem Vencord)" +
+           "O Discord foi restaurado para o original (sem Equicord)" +
            $(if ($cfg.ReabrirDiscord) { " e reaberto." } else { "." }) + $extra
 
-    Show-Box "Vencord Auto-Repair - FALHA" $txt $true 0
+    Show-Box "Equicord Auto-Repair - FALHA" $txt $true 0
 }
 
 # Espera o updater do Discord parar de trocar as pastas app-*.
@@ -332,7 +332,7 @@ function Wait-Settle {
 if ($Once) { Repair 'manual' ([bool]$Force); return }
 
 # Instancia unica via mutex nomeado (nao mata processo nenhum).
-$script:mtx = New-Object System.Threading.Mutex($false, 'VencordAutoRepairWatcher')
+$script:mtx = New-Object System.Threading.Mutex($false, 'EquicordAutoRepairWatcher')
 $owns = $false
 try { $owns = $script:mtx.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $owns = $true }
 if (-not $owns) { Log "Ja existe um vigia rodando - saindo."; return }

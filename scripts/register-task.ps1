@@ -1,4 +1,4 @@
-# Vencord Auto-Repair - registro da tarefa agendada
+# Equicord Auto-Repair - registro da tarefa agendada
 # Copyright (C) 2026 yagoriccomi
 #
 # This program is free software: you can redistribute it and/or modify
@@ -16,8 +16,8 @@
 #
 # Registra a tarefa agendada que inicia o vigia junto com a sessao do usuario.
 # Sem admin. O vigia NAO patcha no logon; so age quando o Discord atualiza ou e aberto.
-$vbs      = "$env:USERPROFILE\Vencord\run-hidden.vbs"
-$taskName = "Vencord Auto-Repair"
+$vbs      = "$env:USERPROFILE\EquicordAutoRepair\run-hidden.vbs"
+$taskName = "Equicord Auto-Repair"
 
 Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
 
@@ -36,7 +36,7 @@ $settings  = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGo
 
 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
     -Principal $principal -Settings $settings `
-    -Description "Reaplica o Vencord apos o Discord atualizar ou ao abrir o Discord. Nao roda em intervalo nem patcha no logon." -Force | Out-Null
+    -Description "Reaplica o Equicord apos o Discord atualizar ou ao abrir o Discord. Nao roda em intervalo nem patcha no logon." -Force | Out-Null
 
 Start-ScheduledTask -TaskName $taskName
 Write-Host "Tarefa '$taskName' registrada e iniciada." -ForegroundColor Green

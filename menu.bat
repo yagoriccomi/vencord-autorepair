@@ -1,5 +1,5 @@
 @echo off
-REM Vencord Auto-Repair - menu
+REM Equicord Auto-Repair - menu
 REM Copyright (C) 2026 yagoriccomi
 REM
 REM This program is free software: you can redistribute it and/or modify
@@ -14,21 +14,21 @@ REM GNU General Public License for more details.
 REM
 REM You should have received a copy of the GNU General Public License
 REM along with this program.  If not, see <https://www.gnu.org/licenses/>.
-title Vencord Auto-Repair
+title Equicord Auto-Repair
 set "SCRIPTS=%~dp0scripts"
-set "INSTALL=%USERPROFILE%\Vencord"
+set "INSTALL=%USERPROFILE%\EquicordAutoRepair"
 set "PS=powershell -NoProfile -ExecutionPolicy Bypass -File"
 
 :menu
 cls
 echo ==================================================
-echo               VENCORD AUTO-REPAIR
+echo               EQUICORD AUTO-REPAIR
 echo ==================================================
 echo.
 echo   --- USAR ---
-echo   [1]  Instalar Vencord + auto-reparo
+echo   [1]  Instalar Equicord + auto-reparo
 echo   [2]  Ver status
-echo   [3]  Aplicar / reparar o Vencord agora
+echo   [3]  Aplicar / reparar o Equicord agora
 echo   [4]  Abrir o Discord
 echo.
 echo   --- AJUSTES ---
@@ -41,7 +41,7 @@ echo   --- MANUTENCAO ---
 echo   [9]  Ver log do vigia
 echo   [10] Reinstalar a tarefa agendada
 echo   [11] Desligar auto-reparo (remove a tarefa)
-echo   [12] Desinstalar TUDO (tarefa + Vencord do Discord)
+echo   [12] Desinstalar TUDO (tarefa + Equicord do Discord)
 echo.
 echo   [0]  Sair
 echo.
@@ -77,10 +77,10 @@ goto menu
 
 :repair
 echo.
-if exist "%INSTALL%\vencord-watch.ps1" (
+if exist "%INSTALL%\equicord-watch.ps1" (
   echo Verificando e aplicando se precisar...
   echo O Discord sera fechado e reaberto se for necessario.
-  %PS% "%INSTALL%\vencord-watch.ps1" -Once -Force
+  %PS% "%INSTALL%\equicord-watch.ps1" -Once -Force
   echo.
   echo Concluido. Veja o log (opcao 9) para os detalhes.
 ) else (
@@ -143,11 +143,11 @@ goto menu
 
 :purge
 echo.
-echo Isso vai remover a tarefa E o Vencord do Discord.
+echo Isso vai remover a tarefa E o Equicord do Discord.
 set "c="
 set /p "c=Tem certeza? (S/N): "
 if /I "%c%"=="S" (
-  %PS% "%SCRIPTS%\uninstall.ps1" -RemoveVencord -Purge
+  %PS% "%SCRIPTS%\uninstall.ps1" -RemoveEquicord -Purge
 )
 pause
 goto menu

@@ -1,4 +1,4 @@
-# Vencord Auto-Repair - status geral
+# Equicord Auto-Repair - status geral
 # Copyright (C) 2026 yagoriccomi
 #
 # This program is free software: you can redistribute it and/or modify
@@ -14,11 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-$base     = "$env:USERPROFILE\Vencord"
+$base     = "$env:USERPROFILE\EquicordAutoRepair"
 $discord  = "$env:LOCALAPPDATA\Discord"
-$taskName = "Vencord Auto-Repair"
+$taskName = "Equicord Auto-Repair"
 
-Write-Host "== Vencord Auto-Repair :: status ==" -ForegroundColor Cyan
+Write-Host "== Equicord Auto-Repair :: status ==" -ForegroundColor Cyan
 
 # ---- Discord + patch ----
 if (Test-Path $discord) {
@@ -38,9 +38,9 @@ if (Test-Path $discord) {
         $res  = Join-Path $app.FullName 'resources'
         $shim = Test-Path (Join-Path $res 'app.asar')
         $orig = Test-Path (Join-Path $res '_app.asar')
-        if     ($shim -and $orig)      { Write-Host "Vencord .......... APLICADO" -ForegroundColor Green }
-        elseif ($shim -and -not $orig) { Write-Host "Vencord .......... nao aplicado (Discord puro)" -ForegroundColor Yellow }
-        else                           { Write-Host "Vencord .......... QUEBRADO - falta o app.asar, o Discord nao abre!" -ForegroundColor Red }
+        if     ($shim -and $orig)      { Write-Host "Equicord .......... APLICADO" -ForegroundColor Green }
+        elseif ($shim -and -not $orig) { Write-Host "Equicord .......... nao aplicado (Discord puro)" -ForegroundColor Yellow }
+        else                           { Write-Host "Equicord .......... QUEBRADO - falta o app.asar, o Discord nao abre!" -ForegroundColor Red }
     } else {
         Write-Host "Discord .......... pasta existe, mas sem versao completa" -ForegroundColor Yellow
     }
@@ -69,7 +69,7 @@ if ($t) {
 
 # ---- Vigia ----
 $proc = Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -match 'vencord-watch\.ps1' -and $_.CommandLine -notmatch 'Win32_Process' }
+    Where-Object { $_.CommandLine -match 'equicord-watch\.ps1' -and $_.CommandLine -notmatch 'Win32_Process' }
 if ($proc) { Write-Host "Vigia ............ rodando (PID $(@($proc)[0].ProcessId))" -ForegroundColor Green }
 else       { Write-Host "Vigia ............ parado" -ForegroundColor Yellow }
 
@@ -95,7 +95,7 @@ if (Test-Path $stFile) {
 # O vigia roda a COPIA instalada. Se voce atualizou o projeto e nao reinstalou,
 # o que roda automaticamente ainda e a versao antiga (ja nos mordeu uma vez).
 $desatualizados = @()
-foreach ($f in @('vencord-watch.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
+foreach ($f in @('equicord-watch.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
     $orig = Join-Path $PSScriptRoot $f
     $dest = Join-Path $base $f
     if (-not (Test-Path $orig)) { continue }
