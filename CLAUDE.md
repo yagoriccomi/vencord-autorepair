@@ -113,6 +113,23 @@ um utilitário de console onde a saída na tela *é* o produto.
 A opção **[4]** do menu copia a fonte para a instalação. Editar aqui **não**
 muda o que roda até reinstalar — o `status` (opção 5) avisa quando divergem.
 
+## 🔁 Pendências não urgentes: agrupar, não empurrar
+
+Correção que **não tem risco hoje** não ganha push dedicado. Anota-se em
+[`REVIEW.md`](REVIEW.md) (seção *Pendência aberta*) com o motivo de ter ficado
+para depois, e ela **pega carona na próxima alteração real** do projeto.
+
+Por quê: cada push que toca código dispara o CI, que aqui roda em runner
+Windows de repositório privado — **multiplicador 2x** de cota. Push de duas
+linhas sem urgência gasta o mesmo que uma entrega de verdade.
+
+> Commit que só toca `.md` **não** dispara o CI (`paths-ignore`), então
+> documentação pode ser commitada à vontade.
+
+**Pendência aberta hoje:** `actions/checkout@v4` e `actions/cache@v4` usam
+Node 20 (depreciado). Não quebra agora — o runner força Node 24. Subir para
+`@v5` junto da próxima mudança em `.github/` ou em `scripts/`.
+
 ## 📋 Convenções
 
 - Comentário explica **o porquê**, não o o-quê. Regra de segurança ganha
