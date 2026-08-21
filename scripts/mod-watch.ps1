@@ -25,13 +25,13 @@ param([switch]$Once, [switch]$Force)
 $ErrorActionPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'mods.ps1')
 . (Join-Path $PSScriptRoot 'discord.ps1')
+. (Join-Path $PSScriptRoot 'ui.ps1')
 
 $base    = "$env:USERPROFILE\DiscordModAutoRepair"
 $discord = "$env:LOCALAPPDATA\Discord"
 $log     = "$base\watch.log"
 $cfgFile = "$base\config.json"
 $stFile  = "$base\state.json"
-$notify  = "$base\notify.vbs"
 
 function Log($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Out-File -FilePath $log -Append -Encoding utf8 }
 
@@ -77,27 +77,6 @@ function Get-State {
     $d
 }
 function Set-State($s) { $s | ConvertTo-Json | Set-Content -Path $stFile -Encoding utf8 }
-
-# ------------------------------------------------------------- interface ----
-# Caixa de aviso lancada como processo separado: nao trava o vigia.
-function Show-Box($titulo, $mensagem, $erro, $segundos) {
-    if (-not (Test-Path $notify)) { return }
-    try {
-        $f = Join-Path $base ("msg-" + [guid]::NewGuid().ToString('N') + ".txt")
-        Set-Content -Path $f -Value $mensagem -Encoding Unicode
-        $tipo = if ($erro) { '1' } else { '0' }
-        Start-Process wscript.exe -ArgumentList "`"$notify`"", "`"$f`"", "`"$titulo`"", $tipo, "$segundos" -WindowStyle Hidden
-    } catch { }
-}
-
-# Pergunta Sim/Nao com contagem regressiva. Sem resposta = segue em frente.
-function Ask-Proceed($mensagem, $segundos) {
-    try {
-        $wsh = New-Object -ComObject WScript.Shell
-        $r = $wsh.Popup($mensagem, $segundos, 'Discord Mod Auto-Repair', 4 + 32)
-        return ($r -ne 7)   # 7 = Nao ; 6 = Sim ; -1 = tempo esgotado
-    } catch { return $true }
-}
 
 # ------------------------------------------------------ build personalizado ----
 # O instalador oficial poe SEMPRE o build padrao do mod. Quem compila a propria
@@ -153,6 +132,31 @@ function Restore-CustomBuild($cfg, $info) {
 }
 
 # ---------------------------------------------------------------- reparo ----
+# Tempos do ciclo de reparo, antes soltos como literais no meio do codigo.
+$script:EsperaAssentarSegundos   = 3    # deixa o instalador terminar de escrever
+$script:EsperaReconferirSegundos = 12   # janela em que o updater do Discord ja desfez o patch
+$script:IntervaloVigiaSegundos   = 5    # ritmo do laco de observacao
+$script:FolgaAposAbrirSegundos   = 5    # deixa o Discord subir antes de conferir
+$script:CiclosParaEstabilizar    = 6    # 6 x 5s = 30s sem a versao mudar
+$script:MaxCiclosEstabilizar     = 120  # teto de ~10 min esperando o updater
+
+# Fecha o Discord para poder mexer nos arquivos, avisando antes se configurado.
+# Devolve 'ok' | 'adiado' (o usuario recusou) | 'falhou' (nao fechou).
+# Extraido porque o mesmo trio avisar/fechar/tratar aparecia em dois pontos.
+function Request-FecharDiscord($cfg, $mensagemAviso) {
+    if (-not (Test-DiscordRodando)) { return 'ok' }
+    if ($cfg.AvisarAntesDeFechar -and -not (Ask-Proceed $mensagemAviso $cfg.SegundosAviso)) { return 'adiado' }
+    if (Stop-DiscordApp -Log $script:LogInfra) { return 'ok' }
+    return 'falhou'
+}
+
+# O mod escolhido esta MESMO aplicado? Conferido pelos arquivos, porque o exit
+# code do instalador ja mentiu antes.
+function Test-ModAplicadoOk($info) {
+    $app = Get-DiscordAppDir
+    return ($app -and (Get-DiscordPatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
+}
+
 function Repair([string]$motivo, [bool]$forcar) {
     $cfg  = Get-Config
     $info = Get-ModInfo $cfg.Mod
@@ -190,18 +194,13 @@ function Repair([string]$motivo, [bool]$forcar) {
         }
 
         Log "$ver com $nome, mas o build proprio NAO esta ativo - repondo. [$motivo]"
-        if (Test-DiscordRodando) {
-            if ($cfg.AvisarAntesDeFechar) {
-                $aviso = "Seus plugins proprios do $nome nao estao ativos." + [char]10 + [char]10 +
-                         "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
-                         "Repor agora?" + [char]10 +
-                         "(Sem resposta, reponho em $($cfg.SegundosAviso)s.)"
-                if (-not (Ask-Proceed $aviso $cfg.SegundosAviso)) {
-                    Log "Usuario adiou a reposicao do build proprio. [$motivo]"
-                    return
-                }
-            }
-            if (-not (Stop-DiscordApp -Log $script:LogInfra)) { Log "Nao consegui fechar o Discord - adiando a reposicao."; return }
+        $aviso = "Seus plugins proprios do $nome nao estao ativos." + [char]10 + [char]10 +
+                 "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
+                 "Repor agora?" + [char]10 +
+                 "(Sem resposta, reponho em $($cfg.SegundosAviso)s.)"
+        switch (Request-FecharDiscord $cfg $aviso) {
+            'adiado' { Log "Usuario adiou a reposicao do build proprio. [$motivo]"; return }
+            'falhou' { Log "Nao consegui fechar o Discord - adiando a reposicao."; return }
         }
 
         $reposto = Restore-CustomBuild $cfg $info
@@ -237,22 +236,17 @@ function Repair([string]$motivo, [bool]$forcar) {
     }
 
     # ---- o Discord PRECISA estar fechado (senao o instalador falha) ----
-    if (Test-DiscordRodando) {
-        if ($cfg.AvisarAntesDeFechar) {
-            $aviso = "O $nome precisa ser aplicado no Discord." + [char]10 + [char]10 +
-                     "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
-                     "Aplicar agora?" + [char]10 +
-                     "(Sem resposta, aplico automaticamente em $($cfg.SegundosAviso)s.)"
-            if (-not (Ask-Proceed $aviso $cfg.SegundosAviso)) {
-                Log "Usuario escolheu adiar. [$motivo]"
-                return
-            }
-        }
-        if (-not (Stop-DiscordApp -Log $script:LogInfra)) {
+    $aviso = "O $nome precisa ser aplicado no Discord." + [char]10 + [char]10 +
+             "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
+             "Aplicar agora?" + [char]10 +
+             "(Sem resposta, aplico automaticamente em $($cfg.SegundosAviso)s.)"
+    switch (Request-FecharDiscord $cfg $aviso) {
+        'adiado' { Log "Usuario escolheu adiar. [$motivo]"; return }
+        'falhou' {
             Log "Nao consegui fechar o Discord - adiando (nao vou arriscar corromper)."
-            Show-Box "Discord Mod Auto-Repair - FALHA" `
+            Show-Erro "$script:TituloApp - FALHA" `
                 ("Nao consegui fechar o Discord para aplicar o $nome." + [char]10 + [char]10 +
-                 "Feche o Discord manualmente e use o menu.bat (opcao 6).") $true 0
+                 "Feche o Discord manualmente e use o menu.bat (opcao 6).")
             return
         }
     }
@@ -271,16 +265,16 @@ function Repair([string]$motivo, [bool]$forcar) {
     Log $saida
     Log "Instalador retornou $code."
 
-    # Confere o resultado de verdade - o exit code sozinho ja mentiu antes.
-    Start-Sleep -Seconds 3
-    $app = Get-DiscordAppDir
-    $ok  = ($app -and (Get-DiscordPatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
+    # Confere pelos arquivos, DUAS vezes: a segunda pega o updater do Discord
+    # desfazendo o patch logo depois de ele ter sido aplicado.
+    Start-Sleep -Seconds $script:EsperaAssentarSegundos
+    $ok = Test-ModAplicadoOk $info
     if ($ok) {
-        Start-Sleep -Seconds 12   # o updater do Discord ja desfez o patch aqui
-        $app = Get-DiscordAppDir
-        $ok  = ($app -and (Get-DiscordPatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
+        Start-Sleep -Seconds $script:EsperaReconferirSegundos
+        $ok = Test-ModAplicadoOk $info
         if (-not $ok) { Log "O patch foi desfeito logo depois (updater do Discord ainda ativo)." }
     }
+    $app = Get-DiscordAppDir
 
     if ($ok) {
         $st.Falhas = 0; $st.Quarentena = $false; Set-State $st
@@ -356,11 +350,11 @@ function Repair([string]$motivo, [bool]$forcar) {
 function Wait-Settle {
     $ultima  = (Get-DiscordAppDir).Name
     $estavel = 0
-    for ($i = 0; $i -lt 120; $i++) {
-        Start-Sleep -Seconds 5
+    for ($i = 0; $i -lt $script:MaxCiclosEstabilizar; $i++) {
+        Start-Sleep -Seconds $script:IntervaloVigiaSegundos
         $agora = (Get-DiscordAppDir).Name
         if ($agora -eq $ultima) { $estavel++ } else { $estavel = 0; $ultima = $agora }
-        if ($estavel -ge 6) { break }   # 30s sem nenhuma mudanca
+        if ($estavel -ge $script:CiclosParaEstabilizar) { break }
     }
     return $ultima
 }
@@ -381,7 +375,7 @@ $wasRunning = Test-DiscordRodando
 Log "Vigia iniciado (sem aplicar nada agora). Mod: $(Get-ModRotulo $cfgIni). Base: $lastVer, Discord aberto=$wasRunning"
 
 while ($true) {
-    Start-Sleep -Seconds 5
+    Start-Sleep -Seconds $script:IntervaloVigiaSegundos
     $cur     = (Get-DiscordAppDir).Name
     $running = Test-DiscordRodando
 
@@ -392,7 +386,7 @@ while ($true) {
         Repair 'update do Discord' $false
     }
     elseif ($running -and -not $wasRunning) {
-        Start-Sleep -Seconds 5
+        Start-Sleep -Seconds $script:FolgaAposAbrirSegundos
         Repair 'abertura do Discord' $false
     }
 

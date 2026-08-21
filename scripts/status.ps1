@@ -112,7 +112,7 @@ if (-not [string]::IsNullOrWhiteSpace($bp) -and $info.SuportaBuildProprio) {
 # O vigia roda a COPIA instalada. Se voce atualizou o projeto e nao reinstalou,
 # o que roda automaticamente ainda e a versao antiga (ja nos mordeu uma vez).
 $desatualizados = @()
-foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'discord.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
+foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'discord.ps1', 'ui.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
     $origem  = Join-Path $PSScriptRoot $f
     $destino = Join-Path $base $f
     if (-not (Test-Path $origem)) { continue }
