@@ -228,3 +228,60 @@ Describe 'Request-FecharDiscord' {
         Request-FecharDiscord $cfgSemAviso 'mensagem' | Should -Be 'ok'
     }
 }
+
+Describe 'Invoke-ComTravaDeOperacao' {
+    # REGRESSAO: em producao, um reparo manual (-Once) e um automatico (vigia)
+    # rodaram o instalador nos MESMOS arquivos com 2s de diferenca. O mutex do
+    # vigia e de tempo de vida e nao serializa isso; este e de operacao.
+
+    BeforeEach {
+        $script:Marcador = Join-Path $TestDrive ("executou-" + [guid]::NewGuid().ToString('N') + ".txt")
+    }
+
+    It 'executa a acao quando nenhum outro reparo esta rodando' {
+        Invoke-ComTravaDeOperacao { Set-Content $script:Marcador 'rodou' }
+        Test-Path $script:Marcador | Should -BeTrue
+    }
+
+    It 'NAO executa a acao enquanto OUTRO PROCESSO segura a trava' {
+        # Mutex nomeado do Windows e REENTRANTE na mesma thread: se o teste
+        # segurasse a trava aqui mesmo, o WaitOne de dentro teria sucesso e o
+        # teste passaria por engano (falso verde). Por isso quem segura e um
+        # outro processo - que e exatamente o cenario real: o vigia rodando de
+        # fundo enquanto o usuario dispara o reparo pelo menu.
+        $sinal = Join-Path $TestDrive 'trava-pega.txt'
+        $job = Start-Job -ArgumentList $sinal -ScriptBlock {
+            param($sinal)
+            $m = New-Object System.Threading.Mutex($false, 'DiscordModAutoRepairOperacao')
+            if ($m.WaitOne(0)) {
+                Set-Content $sinal 'peguei'
+                Start-Sleep -Seconds 10
+                $m.ReleaseMutex()
+            }
+            $m.Dispose()
+        }
+        try {
+            for ($i = 0; $i -lt 60 -and -not (Test-Path $sinal); $i++) { Start-Sleep -Milliseconds 250 }
+            Test-Path $sinal | Should -BeTrue -Because 'o outro processo precisa segurar a trava antes da verificacao'
+
+            Invoke-ComTravaDeOperacao { Set-Content $script:Marcador 'rodou' }
+            Test-Path $script:Marcador | Should -BeFalse
+        } finally {
+            Stop-Job   $job -ErrorAction SilentlyContinue
+            Remove-Job $job -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'libera a trava ao terminar, permitindo o proximo reparo' {
+        Invoke-ComTravaDeOperacao { }
+        Invoke-ComTravaDeOperacao { Set-Content $script:Marcador 'segundo reparo' }
+        Test-Path $script:Marcador | Should -BeTrue
+    }
+
+    # Trava vazada = auto-reparo morto para sempre. Tem de sobreviver a excecao.
+    It 'libera a trava mesmo quando a acao estoura' {
+        { Invoke-ComTravaDeOperacao { throw 'falha no meio do reparo' } } | Should -Throw
+        Invoke-ComTravaDeOperacao { Set-Content $script:Marcador 'depois da excecao' }
+        Test-Path $script:Marcador | Should -BeTrue
+    }
+}

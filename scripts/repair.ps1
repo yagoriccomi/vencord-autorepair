@@ -139,7 +139,38 @@ function Test-ModAplicadoOk($info) {
     return ($app -and (Get-DiscordPatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
 }
 
+$script:NomeMutexOperacao = 'DiscordModAutoRepairOperacao'
+
+# Serializa QUALQUER reparo, venha do vigia ou do menu (-Once).
+#
+# Nao da para reaproveitar o mutex do vigia: aquele e de TEMPO DE VIDA (fica
+# preso enquanto o vigia existir), entao o -Once nunca conseguiria adquiri-lo
+# e a opcao do menu nunca funcionaria. Este e de OPERACAO: so dura o reparo.
+#
+# Sem isto, um reparo manual e um automatico rodavam o instalador nos MESMOS
+# arquivos ao mesmo tempo - observado em producao com 2s de diferenca. Duas
+# escritas simultaneas no mesmo .asar podem corromper a instalacao.
+#
+# WaitOne(0) em vez de esperar: se ja ha um reparo rodando, nao faz sentido
+# enfileirar outro - o trabalho ja esta sendo feito.
+function Invoke-ComTravaDeOperacao([scriptblock]$Acao) {
+    $mtx   = New-Object System.Threading.Mutex($false, $script:NomeMutexOperacao)
+    $tenho = $false
+    try { $tenho = $mtx.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $tenho = $true }
+
+    if (-not $tenho) {
+        Log "Outro reparo ja esta em andamento - saindo para nao mexer nos mesmos arquivos."
+        $mtx.Dispose()
+        return
+    }
+    try { & $Acao } finally { $mtx.ReleaseMutex(); $mtx.Dispose() }
+}
+
 function Repair([string]$motivo, [bool]$forcar) {
+    Invoke-ComTravaDeOperacao { Invoke-Repair $motivo $forcar }
+}
+
+function Invoke-Repair([string]$motivo, [bool]$forcar) {
     $cfg  = Get-Config
     $info = Get-ModInfo $cfg.Mod
     $exe  = Join-Path $base $info.Exe
