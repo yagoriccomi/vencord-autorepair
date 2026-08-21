@@ -191,6 +191,7 @@ function Get-AsarDestino($cfg, $info) {
 }
 
 function Test-CustomBuildAtivo($cfg, $info) {
+    if (-not $info.SuportaBuildProprio)        { return $true }   # mod sem .asar unico
     $origem = [string]$cfg.BuildPersonalizado
     if ([string]::IsNullOrWhiteSpace($origem)) { return $true }   # nao usa build proprio
     if (-not (Test-Path $origem))              { return $true }   # sem origem: avisado em Restore
@@ -202,6 +203,10 @@ function Test-CustomBuildAtivo($cfg, $info) {
 function Restore-CustomBuild($cfg, $info) {
     $origem = [string]$cfg.BuildPersonalizado
     if ([string]::IsNullOrWhiteSpace($origem)) { return $true }   # desligado: nada a fazer
+    if (-not $info.SuportaBuildProprio) {
+        Log "O $($info.Nome) nao carrega um .asar unico - build proprio nao se aplica."
+        return $true
+    }
     $destino = Get-AsarDestino $cfg $info
 
     if (-not (Test-Path $origem)) {

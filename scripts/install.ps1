@@ -87,7 +87,7 @@ if ($aplicado) {
     Write-Host "$($info.Nome) aplicado em $($app.Name)." -ForegroundColor Green
 
     # Build proprio (ex.: Equicord com o GoLiveBypass compilado)
-    if (-not [string]::IsNullOrWhiteSpace($build)) {
+    if (-not [string]::IsNullOrWhiteSpace($build) -and $info.SuportaBuildProprio) {
         $destino = if ($cfg.AsarDoMod) { [string]$cfg.AsarDoMod } else { $info.Asar }
         if (Test-Path $build) {
             $pasta = Split-Path $destino -Parent

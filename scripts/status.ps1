@@ -101,7 +101,7 @@ if (Test-Path $stFile) {
 
 # ---- Build proprio (userplugins compilados por voce, ex.: GoLiveBypass) ----
 $bp = if ($cfg) { [string]$cfg.BuildPersonalizado } else { '' }
-if (-not [string]::IsNullOrWhiteSpace($bp)) {
+if (-not [string]::IsNullOrWhiteSpace($bp) -and $info.SuportaBuildProprio) {
     $dest = if ($cfg.AsarDoMod) { [string]$cfg.AsarDoMod } else { $info.Asar }
     if (-not (Test-Path $bp)) {
         Write-Host "Build proprio .... configurado, mas o arquivo nao existe" -ForegroundColor Red
