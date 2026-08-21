@@ -1,6 +1,7 @@
 # Discord Mod Auto-Repair - status geral
 # Uso particular. Todos os direitos reservados.
 . (Join-Path $PSScriptRoot 'mods.ps1')
+. (Join-Path $PSScriptRoot 'discord.ps1')
 
 $base     = "$env:USERPROFILE\DiscordModAutoRepair"
 $discord  = "$env:LOCALAPPDATA\Discord"
@@ -17,23 +18,13 @@ Write-Host "Mod escolhido .... $(if ($cfg) { Get-ModRotulo $cfg } else { 'nada c
 
 # ---- Discord + patch ----
 if (Test-Path $discord) {
-    # So conta como versao valida se tiver Discord.exe E um .asar: um update
-    # interrompido deixa a pasta so com os .dll/.exe e nao deve ser considerado.
-    $todas = Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue
-    $completa = { param($p)
-        (Test-Path (Join-Path $p 'Discord.exe')) -and
-        ((Test-Path (Join-Path $p 'resources\app.asar')) -or (Test-Path (Join-Path $p 'resources\_app.asar'))) }
-    $app = $todas | Where-Object { & $completa $_.FullName } |
-        Sort-Object @{ Expression = { try { [version]($_.Name -replace '^app-', '') } catch { [version]'0.0.0.0' } } } |
-        Select-Object -Last 1
-    $incompletas = $todas | Where-Object { -not (& $completa $_.FullName) }
+    $app         = Get-DiscordAppDir
+    $incompletas = Get-DiscordAppsIncompletos
 
     if ($app) {
         Write-Host "Discord .......... instalado ($($app.Name))" -ForegroundColor Green
-        $res  = Join-Path $app.FullName 'resources'
-        $shim = Test-Path (Join-Path $res 'app.asar')
-        $orig = Test-Path (Join-Path $res '_app.asar')
-        if ($shim -and $orig) {
+        $patch = Get-DiscordPatchState $app
+        if ($patch -eq 'patched') {
             $aplicado = Get-ModAplicado $app
             $nomeAp = switch ($aplicado) {
                 'equicord' { 'Equicord' }
@@ -47,8 +38,8 @@ if (Test-Path $discord) {
                 Write-Host "                   use a opcao [4] do menu para trocar" -ForegroundColor DarkGray
             }
         }
-        elseif ($shim -and -not $orig) { Write-Host "Mod aplicado ..... nenhum (Discord puro)" -ForegroundColor Yellow }
-        else                           { Write-Host "Mod aplicado ..... QUEBRADO - falta o app.asar, o Discord nao abre!" -ForegroundColor Red }
+        elseif ($patch -eq 'pure') { Write-Host "Mod aplicado ..... nenhum (Discord puro)" -ForegroundColor Yellow }
+        else                       { Write-Host "Mod aplicado ..... QUEBRADO - falta o app.asar, o Discord nao abre!" -ForegroundColor Red }
     } else {
         Write-Host "Discord .......... pasta existe, mas sem versao completa" -ForegroundColor Yellow
     }
@@ -60,7 +51,7 @@ if (Test-Path $discord) {
 }
 
 # ---- Discord rodando ----
-if (Get-Process Discord -ErrorAction SilentlyContinue) {
+if (Test-DiscordRodando) {
     Write-Host "Discord agora .... aberto"
 } else {
     Write-Host "Discord agora .... fechado"
@@ -121,7 +112,7 @@ if (-not [string]::IsNullOrWhiteSpace($bp) -and $info.SuportaBuildProprio) {
 # O vigia roda a COPIA instalada. Se voce atualizou o projeto e nao reinstalou,
 # o que roda automaticamente ainda e a versao antiga (ja nos mordeu uma vez).
 $desatualizados = @()
-foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
+foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'discord.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
     $origem  = Join-Path $PSScriptRoot $f
     $destino = Join-Path $base $f
     if (-not (Test-Path $origem)) { continue }

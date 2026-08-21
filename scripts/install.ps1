@@ -7,10 +7,10 @@
 # 4) Instala o vigia e registra a tarefa agendada
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'mods.ps1')
+. (Join-Path $PSScriptRoot 'discord.ps1')
 
 $InstallDir = "$env:USERPROFILE\DiscordModAutoRepair"
 $Discord    = "$env:LOCALAPPDATA\Discord"
-$Updater    = "$Discord\Update.exe"
 $CfgFile    = "$InstallDir\config.json"
 
 if (-not (Test-Path $Discord)) {
@@ -21,7 +21,7 @@ if (-not (Test-Path $Discord)) {
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
 # Copia os scripts do projeto para a pasta de instalacao
-foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
+foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'discord.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
     Copy-Item "$PSScriptRoot\$f" $InstallDir -Force
 }
 
@@ -53,16 +53,9 @@ Write-Host "Checksum OK." -ForegroundColor Green
 
 # O Discord PRECISA estar fechado: com ele aberto o instalador recusa
 # ("files are used by a different process") e pode deixar tudo quebrado.
-$estavaAberto = [bool](Get-Process Discord -ErrorAction SilentlyContinue)
+$estavaAberto = Test-DiscordRodando
 if ($estavaAberto) {
-    Write-Host "Fechando o Discord (obrigatorio para aplicar o patch)..." -ForegroundColor Yellow
-    Get-Process Discord -ErrorAction SilentlyContinue | ForEach-Object { $null = $_.CloseMainWindow() }
-    for ($i = 0; $i -lt 8; $i++) {
-        Start-Sleep -Seconds 1
-        if (-not (Get-Process Discord -ErrorAction SilentlyContinue)) { break }
-    }
-    Get-Process Discord -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Seconds 3
+    Stop-DiscordApp -Log { param($m) Write-Host $m -ForegroundColor Yellow } | Out-Null
 }
 
 # Aplica o mod (se houver outro aplicado, o instalador desfaz antes)
@@ -72,15 +65,8 @@ $code = $LASTEXITCODE
 
 # Confere de verdade (o exit code sozinho nao basta)
 Start-Sleep -Seconds 2
-$app = Get-ChildItem $Discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
-    Where-Object {
-        (Test-Path (Join-Path $_.FullName 'Discord.exe')) -and
-        ((Test-Path (Join-Path $_.FullName 'resources\app.asar')) -or
-         (Test-Path (Join-Path $_.FullName 'resources\_app.asar'))) } |
-    Sort-Object @{ Expression = { try { [version]($_.Name -replace '^app-', '') } catch { [version]'0.0.0.0' } } } |
-    Select-Object -Last 1
-
-$aplicado = $app -and (Test-Path (Join-Path $app.FullName 'resources\_app.asar')) -and
+$app = Get-DiscordAppDir
+$aplicado = $app -and ((Get-DiscordPatchState $app) -eq 'patched') -and
             ((Get-ModAplicado $app) -eq $info.Id)
 
 if ($aplicado) {
@@ -113,20 +99,11 @@ if ($aplicado) {
 
 # Reabre o Discord se ele estava aberto antes (conferindo se subiu mesmo)
 if ($estavaAberto) {
-    $subiu = $false
-    if (Test-Path $Updater) {
-        Start-Process $Updater -ArgumentList '--processStart', 'Discord.exe'
-        for ($i = 0; $i -lt 12; $i++) {
-            Start-Sleep -Seconds 1
-            if (Get-Process Discord -ErrorAction SilentlyContinue) { $subiu = $true; break }
-        }
+    if (Start-DiscordApp -Log { param($m) Write-Host $m -ForegroundColor DarkGray }) {
+        Write-Host "Discord reaberto." -ForegroundColor Green
+    } else {
+        Write-Host "Nao consegui reabrir o Discord - abra manualmente." -ForegroundColor Yellow
     }
-    if (-not $subiu -and $app) {
-        $bin = Join-Path $app.FullName 'Discord.exe'
-        if (Test-Path $bin) { Start-Process $bin; $subiu = $true }
-    }
-    if ($subiu) { Write-Host "Discord reaberto." -ForegroundColor Green }
-    else        { Write-Host "Nao consegui reabrir o Discord - abra manualmente." -ForegroundColor Yellow }
 }
 
 Write-Host ""

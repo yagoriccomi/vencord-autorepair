@@ -24,6 +24,7 @@ param([switch]$Once, [switch]$Force)
 
 $ErrorActionPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'mods.ps1')
+. (Join-Path $PSScriptRoot 'discord.ps1')
 
 $base    = "$env:USERPROFILE\DiscordModAutoRepair"
 $discord = "$env:LOCALAPPDATA\Discord"
@@ -31,9 +32,12 @@ $log     = "$base\watch.log"
 $cfgFile = "$base\config.json"
 $stFile  = "$base\state.json"
 $notify  = "$base\notify.vbs"
-$updater = "$discord\Update.exe"
 
 function Log($m) { "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Out-File -FilePath $log -Append -Encoding utf8 }
+
+# A camada de acesso ao Discord nao conhece o nosso log: recebe este
+# scriptblock injetado e reporta por ele [#20][#21].
+$script:LogInfra = { param($m) Log $m }
 
 # ---------------------------------------------------------------- config ----
 function Get-Config {
@@ -93,90 +97,6 @@ function Ask-Proceed($mensagem, $segundos) {
         $r = $wsh.Popup($mensagem, $segundos, 'Discord Mod Auto-Repair', 4 + 32)
         return ($r -ne 7)   # 7 = Nao ; 6 = Sim ; -1 = tempo esgotado
     } catch { return $true }
-}
-
-# --------------------------------------------------------------- Discord ----
-# Uma pasta app-* so conta como versao de verdade se tiver o Discord.exe E um
-# .asar em resources. O updater do Discord copia o Discord.exe ANTES do
-# resources, e um download interrompido deixa a pasta so com os .dll/.exe:
-# sem esta checagem o vigia elegia esse esqueleto como "versao atual", achava
-# que estava quebrada e tentava patchear o que nem existe.
-# Versao comparada como NUMERO (texto quebraria em 1.0.10000).
-function Test-AppCompleto($dir) {
-    (Test-Path (Join-Path $dir 'Discord.exe')) -and
-    ((Test-Path (Join-Path $dir 'resources\app.asar')) -or
-     (Test-Path (Join-Path $dir 'resources\_app.asar')))
-}
-
-function Get-AppDir {
-    Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
-        Where-Object { Test-AppCompleto $_.FullName } |
-        Sort-Object @{ Expression = {
-            try { [version]($_.Name -replace '^app-', '') } catch { [version]'0.0.0.0' } } } |
-        Select-Object -Last 1
-}
-
-function Get-AppIncompletos {
-    Get-ChildItem $discord -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
-        Where-Object { -not (Test-AppCompleto $_.FullName) }
-}
-
-# O mod renomeia app.asar -> _app.asar e poe um shim no lugar.
-#   patched = os dois existem | pure = so o app.asar original
-#   broken  = falta o app.asar -> o Discord ABRE E FECHA SOZINHO
-function Get-PatchState($appDir) {
-    $res  = Join-Path $appDir.FullName 'resources'
-    $shim = Test-Path (Join-Path $res 'app.asar')
-    $orig = Test-Path (Join-Path $res '_app.asar')
-    if     ($shim -and $orig)       { 'patched' }
-    elseif ($shim -and -not $orig)  { 'pure'    }
-    else                            { 'broken'  }
-}
-
-function Stop-Discord {
-    $p = Get-Process Discord -ErrorAction SilentlyContinue
-    if (-not $p) { return $true }
-    Log "Fechando o Discord para liberar os arquivos..."
-    # O Discord normalmente so minimiza para a bandeja em vez de sair, entao
-    # esperamos pouco pelo fechamento educado e partimos para o encerramento.
-    foreach ($x in $p) { $null = $x.CloseMainWindow() }
-    for ($i = 0; $i -lt 6; $i++) {
-        Start-Sleep -Seconds 1
-        if (-not (Get-Process Discord -ErrorAction SilentlyContinue)) { break }
-    }
-    if (Get-Process Discord -ErrorAction SilentlyContinue) {
-        Log "Discord foi para a bandeja - encerrando o processo."
-        Get-Process Discord -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-        Start-Sleep -Seconds 3
-    }
-    Start-Sleep -Seconds 2   # folga para o Windows soltar os arquivos
-    return (-not (Get-Process Discord -ErrorAction SilentlyContinue))
-}
-
-# Reabre o Discord e CONFERE se ele realmente subiu. O Update.exe (Squirrel)
-# as vezes diz "About to launch" e nao sobe nada, entao existe um plano B.
-function Start-Discord {
-    if (Test-Path $updater) {
-        Start-Process $updater -ArgumentList '--processStart', 'Discord.exe'
-        for ($i = 0; $i -lt 12; $i++) {
-            Start-Sleep -Seconds 1
-            if (Get-Process Discord -ErrorAction SilentlyContinue) { Log "Discord reaberto."; return $true }
-        }
-        Log "Update.exe nao subiu o Discord - tentando abrir direto."
-    }
-    $app = Get-AppDir
-    if ($app) {
-        $bin = Join-Path $app.FullName 'Discord.exe'
-        if (Test-Path $bin) {
-            Start-Process $bin
-            for ($i = 0; $i -lt 15; $i++) {
-                Start-Sleep -Seconds 1
-                if (Get-Process Discord -ErrorAction SilentlyContinue) { Log "Discord reaberto (direto)."; return $true }
-            }
-        }
-    }
-    Log "NAO consegui reabrir o Discord."
-    return $false
 }
 
 # ------------------------------------------------------ build personalizado ----
@@ -242,12 +162,12 @@ function Repair([string]$motivo, [bool]$forcar) {
     if (-not (Test-Path $exe))     { Log "Instalador do $nome ausente ($exe) - abortando."; return }
     if (-not (Test-Path $discord)) { Log "Discord nao instalado."; return }
 
-    $incompletos = Get-AppIncompletos
+    $incompletos = Get-DiscordAppsIncompletos
     if ($incompletos) {
         Log "Ignorando update incompleto do Discord: $(($incompletos | ForEach-Object { $_.Name }) -join ', ')"
     }
 
-    $app = Get-AppDir
+    $app = Get-DiscordAppDir
     if (-not $app) { Log "Nenhuma versao completa do Discord - esperando o download terminar."; return }
     $ver = $app.Name
 
@@ -257,7 +177,7 @@ function Repair([string]$motivo, [bool]$forcar) {
         $st.Versao = $ver; $st.Falhas = 0; $st.Quarentena = $false; Set-State $st
     }
 
-    $estado     = Get-PatchState $app
+    $estado     = Get-DiscordPatchState $app
     $modNoDisco = Get-ModAplicado $app
 
     if ($estado -eq 'patched' -and $modNoDisco -eq $info.Id) {
@@ -270,7 +190,7 @@ function Repair([string]$motivo, [bool]$forcar) {
         }
 
         Log "$ver com $nome, mas o build proprio NAO esta ativo - repondo. [$motivo]"
-        if (Get-Process Discord -ErrorAction SilentlyContinue) {
+        if (Test-DiscordRodando) {
             if ($cfg.AvisarAntesDeFechar) {
                 $aviso = "Seus plugins proprios do $nome nao estao ativos." + [char]10 + [char]10 +
                          "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
@@ -281,11 +201,11 @@ function Repair([string]$motivo, [bool]$forcar) {
                     return
                 }
             }
-            if (-not (Stop-Discord)) { Log "Nao consegui fechar o Discord - adiando a reposicao."; return }
+            if (-not (Stop-DiscordApp -Log $script:LogInfra)) { Log "Nao consegui fechar o Discord - adiando a reposicao."; return }
         }
 
         $reposto = Restore-CustomBuild $cfg $info
-        if ($cfg.ReabrirDiscord) { $null = Start-Discord }
+        if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Log $script:LogInfra }
         if ($reposto) {
             if ($cfg.NotificarSucesso) {
                 Show-Box "Discord Mod Auto-Repair" `
@@ -317,7 +237,7 @@ function Repair([string]$motivo, [bool]$forcar) {
     }
 
     # ---- o Discord PRECISA estar fechado (senao o instalador falha) ----
-    if (Get-Process Discord -ErrorAction SilentlyContinue) {
+    if (Test-DiscordRodando) {
         if ($cfg.AvisarAntesDeFechar) {
             $aviso = "O $nome precisa ser aplicado no Discord." + [char]10 + [char]10 +
                      "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
@@ -328,7 +248,7 @@ function Repair([string]$motivo, [bool]$forcar) {
                 return
             }
         }
-        if (-not (Stop-Discord)) {
+        if (-not (Stop-DiscordApp -Log $script:LogInfra)) {
             Log "Nao consegui fechar o Discord - adiando (nao vou arriscar corromper)."
             Show-Box "Discord Mod Auto-Repair - FALHA" `
                 ("Nao consegui fechar o Discord para aplicar o $nome." + [char]10 + [char]10 +
@@ -353,12 +273,12 @@ function Repair([string]$motivo, [bool]$forcar) {
 
     # Confere o resultado de verdade - o exit code sozinho ja mentiu antes.
     Start-Sleep -Seconds 3
-    $app = Get-AppDir
-    $ok  = ($app -and (Get-PatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
+    $app = Get-DiscordAppDir
+    $ok  = ($app -and (Get-DiscordPatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
     if ($ok) {
         Start-Sleep -Seconds 12   # o updater do Discord ja desfez o patch aqui
-        $app = Get-AppDir
-        $ok  = ($app -and (Get-PatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
+        $app = Get-DiscordAppDir
+        $ok  = ($app -and (Get-DiscordPatchState $app) -eq 'patched' -and (Get-ModAplicado $app) -eq $info.Id)
         if (-not $ok) { Log "O patch foi desfeito logo depois (updater do Discord ainda ativo)." }
     }
 
@@ -385,7 +305,7 @@ function Repair([string]$motivo, [bool]$forcar) {
                  "Reconstrua o build (menu, opcao 13) e use a opcao 6.") $true 0
         }
 
-        if ($cfg.ReabrirDiscord) { $null = Start-Discord }
+        if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Log $script:LogInfra }
         if ($cfg.NotificarSucesso -and -not $buildFalhou) {
             Show-Box "Discord Mod Auto-Repair" `
                 ("$nome aplicado com sucesso!" + [char]10 + [char]10 +
@@ -401,11 +321,11 @@ function Repair([string]$motivo, [bool]$forcar) {
     $limpeza = & $exe -uninstall -location $discord 2>&1 | Out-String
     Log (($limpeza -replace '[^\x20-\x7E\r\n]', '').Trim())
 
-    $app     = Get-AppDir
-    $estado2 = if ($app) { Get-PatchState $app } else { 'desconhecido' }
+    $app     = Get-DiscordAppDir
+    $estado2 = if ($app) { Get-DiscordPatchState $app } else { 'desconhecido' }
     Log "Estado depois da limpeza: $estado2"
 
-    if ($cfg.ReabrirDiscord) { $null = Start-Discord }
+    if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Log $script:LogInfra }
 
     $extra = ''
     if ([int]$st.Falhas -ge [int]$cfg.MaxTentativas) {
@@ -434,11 +354,11 @@ function Repair([string]$motivo, [bool]$forcar) {
 
 # Espera o updater do Discord parar de trocar as pastas app-*.
 function Wait-Settle {
-    $ultima  = (Get-AppDir).Name
+    $ultima  = (Get-DiscordAppDir).Name
     $estavel = 0
     for ($i = 0; $i -lt 120; $i++) {
         Start-Sleep -Seconds 5
-        $agora = (Get-AppDir).Name
+        $agora = (Get-DiscordAppDir).Name
         if ($agora -eq $ultima) { $estavel++ } else { $estavel = 0; $ultima = $agora }
         if ($estavel -ge 6) { break }   # 30s sem nenhuma mudanca
     }
@@ -456,14 +376,14 @@ if (-not $owns) { Log "Ja existe um vigia rodando - saindo."; return }
 
 # Estado inicial: NAO aplica nada agora. So registra a linha de base.
 $cfgIni     = Get-Config
-$lastVer    = (Get-AppDir).Name
-$wasRunning = [bool](Get-Process Discord -ErrorAction SilentlyContinue)
+$lastVer    = (Get-DiscordAppDir).Name
+$wasRunning = Test-DiscordRodando
 Log "Vigia iniciado (sem aplicar nada agora). Mod: $(Get-ModRotulo $cfgIni). Base: $lastVer, Discord aberto=$wasRunning"
 
 while ($true) {
     Start-Sleep -Seconds 5
-    $cur     = (Get-AppDir).Name
-    $running = [bool](Get-Process Discord -ErrorAction SilentlyContinue)
+    $cur     = (Get-DiscordAppDir).Name
+    $running = Test-DiscordRodando
 
     if ($cur -and $cur -ne $lastVer) {
         Log "Mudanca de versao: $lastVer -> $cur. Esperando o Discord terminar de atualizar..."
@@ -477,5 +397,5 @@ while ($true) {
     }
 
     # Relido DEPOIS do reparo: o proprio reparo fecha/reabre o Discord.
-    $wasRunning = [bool](Get-Process Discord -ErrorAction SilentlyContinue)
+    $wasRunning = Test-DiscordRodando
 }
