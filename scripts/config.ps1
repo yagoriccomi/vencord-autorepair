@@ -1,18 +1,5 @@
 # Equicord Auto-Repair - configuracao
-# Copyright (C) 2026 yagoriccomi
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# Uso particular. Todos os direitos reservados.
 #
 # Le e altera as opcoes do auto-reparo (usado pelo menu.bat).
 param([ValidateSet('mostrar', 'sucesso', 'aviso', 'reabrir', 'resetar')][string]$Action = 'mostrar')
@@ -28,6 +15,8 @@ function Get-Config {
         SegundosAviso       = 8
         ReabrirDiscord      = $true
         MaxTentativas       = 3
+        BuildPersonalizado  = ''
+        AsarDoMod           = ''
     }
     if (Test-Path $cfgFile) {
         try {
@@ -74,5 +63,11 @@ switch ($Action) {
         Write-Host "  Perguntar antes de fechar ........ $(OnOff $cfg.AvisarAntesDeFechar) ($($cfg.SegundosAviso)s)"
         Write-Host "  Reabrir o Discord sozinho ........ $(OnOff $cfg.ReabrirDiscord)"
         Write-Host "  Tentativas antes de pausar ....... $($cfg.MaxTentativas)"
+        $bp = [string]$cfg.BuildPersonalizado
+        if ([string]::IsNullOrWhiteSpace($bp)) {
+            Write-Host "  Build personalizado .............. nenhum (usa o build padrao)"
+        } else {
+            Write-Host "  Build personalizado .............. $bp"
+        }
     }
 }

@@ -1,19 +1,6 @@
 @echo off
 REM Equicord Auto-Repair - menu
-REM Copyright (C) 2026 yagoriccomi
-REM
-REM This program is free software: you can redistribute it and/or modify
-REM it under the terms of the GNU General Public License as published by
-REM the Free Software Foundation, either version 3 of the License, or
-REM (at your option) any later version.
-REM
-REM This program is distributed in the hope that it will be useful,
-REM but WITHOUT ANY WARRANTY; without even the implied warranty of
-REM MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-REM GNU General Public License for more details.
-REM
-REM You should have received a copy of the GNU General Public License
-REM along with this program.  If not, see <https://www.gnu.org/licenses/>.
+REM Uso particular. Todos os direitos reservados.
 title Equicord Auto-Repair
 set "SCRIPTS=%~dp0scripts"
 set "INSTALL=%USERPROFILE%\EquicordAutoRepair"
@@ -42,6 +29,7 @@ echo   [9]  Ver log do vigia
 echo   [10] Reinstalar a tarefa agendada
 echo   [11] Desligar auto-reparo (remove a tarefa)
 echo   [12] Desinstalar TUDO (tarefa + Equicord do Discord)
+echo   [13] Reconstruir o build personalizado (pnpm build)
 echo.
 echo   [0]  Sair
 echo.
@@ -60,6 +48,7 @@ if "%op%"=="9"  goto log
 if "%op%"=="10" goto regtask
 if "%op%"=="11" goto uninstall
 if "%op%"=="12" goto purge
+if "%op%"=="13" goto rebuild
 if "%op%"=="0"  goto end
 goto menu
 
@@ -149,6 +138,12 @@ set /p "c=Tem certeza? (S/N): "
 if /I "%c%"=="S" (
   %PS% "%SCRIPTS%\uninstall.ps1" -RemoveEquicord -Purge
 )
+pause
+goto menu
+
+:rebuild
+echo.
+%PS% "%SCRIPTS%\rebuild.ps1"
 pause
 goto menu
 

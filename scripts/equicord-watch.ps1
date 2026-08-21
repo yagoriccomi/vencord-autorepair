@@ -1,18 +1,5 @@
 # Equicord Auto-Repair - vigia
-# Copyright (C) 2026 yagoriccomi
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# Uso particular. Todos os direitos reservados.
 #
 # Reaplica o Equicord APENAS em dois momentos:
 #   1) quando o Discord instala uma nova versao;
@@ -54,6 +41,9 @@ function Get-Config {
         SegundosAviso       = 8       # tempo do aviso ate seguir sozinho
         ReabrirDiscord      = $true   # reabre o Discord depois de mexer
         MaxTentativas       = 3       # falhas na mesma versao ate a quarentena
+        BuildPersonalizado  = ''      # .asar de um build proprio (com userplugins);
+                                      # vazio = usa o build padrao do Equilotl
+        AsarDoMod           = ''      # destino; vazio = %APPDATA%\Equicord\equicord.asar
     }
     if (Test-Path $cfgFile) {
         try {
@@ -189,6 +179,60 @@ function Start-Discord {
     return $false
 }
 
+# ------------------------------------------------------ build personalizado ----
+# O Equilotl instala SEMPRE o build padrao do Equicord. Quem compila a propria
+# versao (src/userplugins) perde os plugins proprios a cada reparo, porque o
+# patch passa a apontar para o .asar padrao. Esta funcao devolve o build proprio
+# por cima do padrao, logo depois do patch e antes de reabrir o Discord.
+# O build proprio e o que o Discord esta carregando de fato?
+function Test-CustomBuildAtivo($cfg) {
+    $origem = [string]$cfg.BuildPersonalizado
+    if ([string]::IsNullOrWhiteSpace($origem)) { return $true }   # nao usa build proprio
+    if (-not (Test-Path $origem))              { return $true }   # sem origem: avisado em Restore
+
+    $destino = [string]$cfg.AsarDoMod
+    if ([string]::IsNullOrWhiteSpace($destino)) {
+        $destino = Join-Path $env:APPDATA 'Equicord\equicord.asar'
+    }
+    if (-not (Test-Path $destino)) { return $false }
+    return ((Get-FileHash $origem -Algorithm SHA256).Hash -eq (Get-FileHash $destino -Algorithm SHA256).Hash)
+}
+
+function Restore-CustomBuild($cfg) {
+    $origem = [string]$cfg.BuildPersonalizado
+    if ([string]::IsNullOrWhiteSpace($origem)) { return $true }   # desligado: nada a fazer
+
+    $destino = [string]$cfg.AsarDoMod
+    if ([string]::IsNullOrWhiteSpace($destino)) {
+        $destino = Join-Path $env:APPDATA 'Equicord\equicord.asar'
+    }
+
+    if (-not (Test-Path $origem)) {
+        Log "Build personalizado nao encontrado em $origem - ficando com o build padrao."
+        return $false
+    }
+
+    try {
+        $pasta = Split-Path $destino -Parent
+        if (-not (Test-Path $pasta)) { New-Item -ItemType Directory -Force -Path $pasta | Out-Null }
+        Copy-Item $origem $destino -Force -ErrorAction Stop
+    } catch {
+        Log "Falha ao restaurar o build personalizado: $($_.Exception.Message)"
+        return $false
+    }
+
+    # confere que chegou inteiro (copia truncada = Discord que nao abre)
+    $tamOrigem  = (Get-Item $origem).Length
+    $tamDestino = if (Test-Path $destino) { (Get-Item $destino).Length } else { -1 }
+    if ($tamOrigem -ne $tamDestino) {
+        Log "Build personalizado copiado pela metade ($tamDestino de $tamOrigem bytes)."
+        return $false
+    }
+
+    Log "Build personalizado restaurado ($([math]::Round($tamOrigem / 1MB, 1)) MB)."
+    return $true
+}
+
 # ---------------------------------------------------------------- reparo ----
 function Repair([string]$motivo, [bool]$forcar) {
     $cfg = Get-Config
@@ -211,7 +255,48 @@ function Repair([string]$motivo, [bool]$forcar) {
     }
 
     $estado = Get-PatchState $app
-    if ($estado -eq 'patched') { Log "$ver ja com Equicord - nada a fazer. [$motivo]"; return }
+    if ($estado -eq 'patched') {
+        # O patch do Discord esta bom. Mas o Equilotl instala SEMPRE o build
+        # padrao, entao os plugins proprios podem ter sido substituidos sem que
+        # o patch mude nada - some em silencio se ninguem conferir.
+        if (Test-CustomBuildAtivo $cfg) {
+            Log "$ver ja com Equicord - nada a fazer. [$motivo]"
+            return
+        }
+
+        Log "$ver com Equicord, mas o build personalizado NAO esta ativo - repondo. [$motivo]"
+        if (Get-Process Discord -ErrorAction SilentlyContinue) {
+            if ($cfg.AvisarAntesDeFechar) {
+                $aviso = "Seus plugins proprios do Equicord nao estao ativos." + [char]10 + [char]10 +
+                         "O Discord vai fechar por alguns segundos e reabrir sozinho." + [char]10 + [char]10 +
+                         "Repor agora?" + [char]10 +
+                         "(Sem resposta, reponho em $($cfg.SegundosAviso)s.)"
+                if (-not (Ask-Proceed $aviso $cfg.SegundosAviso)) {
+                    Log "Usuario adiou a reposicao do build personalizado. [$motivo]"
+                    return
+                }
+            }
+            if (-not (Stop-Discord)) { Log "Nao consegui fechar o Discord - adiando a reposicao."; return }
+        }
+
+        $reposto = Restore-CustomBuild $cfg
+        if ($cfg.ReabrirDiscord) { $null = Start-Discord }
+        if ($reposto) {
+            if ($cfg.NotificarSucesso) {
+                Show-Box "Equicord Auto-Repair" `
+                    ("Build personalizado restaurado." + [char]10 + [char]10 +
+                     "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 + [char]10 +
+                     "O Discord esta sendo reaberto com os seus plugins.") $false 8
+            }
+        } else {
+            Show-Box "Equicord Auto-Repair - ATENCAO" `
+                ("Nao consegui restaurar o seu build personalizado." + [char]10 + [char]10 +
+                 "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
+                 "Origem: $($cfg.BuildPersonalizado)" + [char]10 + [char]10 +
+                 "O Discord esta com o Equicord padrao, sem os seus plugins.") $true 0
+        }
+        return
+    }
     if ($estado -eq 'broken')  { Log "$ver QUEBRADO (app.asar ausente) - o Discord nao abre assim. Vou restaurar." }
 
     if ($st.Quarentena -and -not $forcar) {
@@ -268,12 +353,32 @@ function Repair([string]$motivo, [bool]$forcar) {
     if ($ok) {
         $st.Falhas = 0; $st.Quarentena = $false; Set-State $st
         Log "SUCESSO: Equicord aplicado em $($app.Name)."
+
+        # Devolve o build proprio ANTES de reabrir: com o Discord fechado o
+        # .asar nao esta em uso e a copia nao falha.
+        $buildOk     = Restore-CustomBuild $cfg
+        $temBuild    = -not [string]::IsNullOrWhiteSpace([string]$cfg.BuildPersonalizado)
+        $buildFalhou = ($temBuild -and -not $buildOk)
+        $extraBuild  = ''
+        if ($temBuild -and $buildOk) { $extraBuild = [char]10 + "Build personalizado: restaurado." }
+
+        # Perder o build proprio e silencioso demais para passar batido: o
+        # Equicord volta, mas sem os plugins compilados por voce.
+        if ($buildFalhou) {
+            Show-Box "Equicord Auto-Repair - ATENCAO" `
+                ("O Equicord foi aplicado, mas NAO consegui restaurar o seu build personalizado." + [char]10 + [char]10 +
+                 "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
+                 "Origem: $($cfg.BuildPersonalizado)" + [char]10 + [char]10 +
+                 "O Discord vai abrir com o Equicord padrao - seus plugins proprios nao estarao ativos." + [char]10 +
+                 "Reconstrua o build (menu, opcao 13) e use a opcao 3.") $true 0
+        }
+
         if ($cfg.ReabrirDiscord) { $null = Start-Discord }
-        if ($cfg.NotificarSucesso) {
+        if ($cfg.NotificarSucesso -and -not $buildFalhou) {
             Show-Box "Equicord Auto-Repair" `
                 ("Equicord aplicado com sucesso!" + [char]10 + [char]10 +
                  "Quando: $(Get-Date -Format 'dd/MM/yyyy HH:mm:ss')" + [char]10 +
-                 "Versao do Discord: $($app.Name)" + [char]10 + [char]10 +
+                 "Versao do Discord: $($app.Name)" + $extraBuild + [char]10 + [char]10 +
                  "O Discord esta sendo reaberto.") $false 8
         }
         return

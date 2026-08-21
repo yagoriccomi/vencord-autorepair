@@ -1,18 +1,5 @@
 # Equicord Auto-Repair - status geral
-# Copyright (C) 2026 yagoriccomi
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+# Uso particular. Todos os direitos reservados.
 #
 $base     = "$env:USERPROFILE\EquicordAutoRepair"
 $discord  = "$env:LOCALAPPDATA\Discord"
@@ -89,6 +76,26 @@ if (Test-Path $stFile) {
     } catch { }
 } else {
     Write-Host "Auto-reparo ...... ativo, sem falhas" -ForegroundColor Green
+}
+
+# ---- Build personalizado (userplugins compilados por voce) ----
+$cfgFile = "$base\config.json"
+$cfgJson = $null
+if (Test-Path $cfgFile) { try { $cfgJson = Get-Content $cfgFile -Raw | ConvertFrom-Json } catch { } }
+$bp = if ($cfgJson) { [string]$cfgJson.BuildPersonalizado } else { '' }
+if (-not [string]::IsNullOrWhiteSpace($bp)) {
+    $dest = if ($cfgJson.AsarDoMod) { [string]$cfgJson.AsarDoMod } else { Join-Path $env:APPDATA 'Equicord\equicord.asar' }
+    if (-not (Test-Path $bp)) {
+        Write-Host "Build proprio .... configurado, mas o arquivo nao existe" -ForegroundColor Red
+        Write-Host "                   $bp" -ForegroundColor DarkGray
+    } elseif (-not (Test-Path $dest)) {
+        Write-Host "Build proprio .... NAO aplicado (o Equicord nem esta instalado)" -ForegroundColor Yellow
+    } elseif ((Get-FileHash $bp -Algorithm SHA256).Hash -eq (Get-FileHash $dest -Algorithm SHA256).Hash) {
+        Write-Host "Build proprio .... ATIVO no Discord" -ForegroundColor Green
+    } else {
+        Write-Host "Build proprio .... NAO esta ativo - o Discord carrega o build padrao" -ForegroundColor Yellow
+        Write-Host "                   use a opcao [3] do menu para aplicar" -ForegroundColor DarkGray
+    }
 }
 
 # ---- Os scripts instalados estao iguais aos desta pasta? ----

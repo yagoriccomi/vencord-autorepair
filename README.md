@@ -161,17 +161,42 @@ Quando o Discord terminar de baixar aquela versão, aí sim o Equicord é aplica
 
 ---
 
-## 📜 Licença
+## 🧩 Build personalizado (plugins compilados por você)
 
-**GNU General Public License v3.0** (GPLv3). Você pode **usar, estudar, mudar e compartilhar** — versões modificadas também precisam ficar abertas sob a mesma licença. Texto completo em [`LICENSE`](LICENSE).
+Se você compila o Equicord da fonte para incluir **userplugins** (plugins que não vêm no Equicord oficial), existe uma pegadinha:
+
+> O Equilotl instala **sempre o build padrão**. Toda vez que o auto-reparo repõe o Equicord depois de uma atualização do Discord, você volta para o build oficial — **sem os seus plugins**, e sem nada avisando.
+
+Por isso o auto-reparo restaura o seu build logo depois de aplicar o patch, antes de reabrir o Discord.
+
+**Como configurar** — em `C:\Users\SEU-NOME\EquicordAutoRepair\config.json`:
+
+```json
+{
+  "BuildPersonalizado": "C:\\Users\\SEU-NOME\\Equicord\\dist\\desktop.asar"
+}
+```
+
+Deixe `""` para usar sempre o build padrão.
+
+**Mexeu no código dos plugins?** Menu → opção **13** (roda `pnpm build`) e depois **3** para aplicar.
+
+O status (opção **2**) mostra se está valendo de verdade:
 
 ```
-Copyright (C) 2026 yagoriccomi
-
-Este programa é software livre: você pode redistribuí-lo e/ou modificá-lo
-sob os termos da GNU General Public License, versão 3, publicada pela
-Free Software Foundation. Sem QUALQUER GARANTIA. Veja o arquivo LICENSE.
+Equicord ......... APLICADO
+Build proprio .... ATIVO no Discord
 ```
+
+Se a restauração falhar, aparece uma **caixa de aviso na tela** — porque o Equicord voltaria funcionando e você não notaria que os seus plugins sumiram.
+
+---
+
+## 📜 Uso
+
+**Projeto particular.** © 2026 yagoriccomi — todos os direitos reservados.
+
+Repositório privado, **sem licença de uso**: não é software livre, não está aberto para redistribuição ou modificação por terceiros.
 
 ---
 
