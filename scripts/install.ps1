@@ -21,7 +21,7 @@ if (-not (Test-Path $Discord)) {
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 
 # Copia os scripts do projeto para a pasta de instalacao
-foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'discord.ps1', 'ui.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
+foreach ($f in @('mod-watch.ps1', 'mods.ps1', 'discord.ps1', 'ui.ps1', 'repair.ps1', 'register-task.ps1', 'run-hidden.vbs', 'notify.vbs', 'config.ps1')) {
     Copy-Item "$PSScriptRoot\$f" $InstallDir -Force
 }
 

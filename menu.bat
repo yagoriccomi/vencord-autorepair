@@ -39,6 +39,7 @@ echo   [13] Reconstruir o build proprio (pnpm build)
 echo   [14] Reinstalar a tarefa agendada
 echo   [15] Desligar o auto-reparo (remove a tarefa)
 echo   [16] Desinstalar TUDO (tarefa + mod do Discord)
+echo   [17] Rodar os testes
 echo.
 echo   [0]  Sair
 echo.
@@ -61,6 +62,7 @@ if "%op%"=="13" goto rebuild
 if "%op%"=="14" goto regtask
 if "%op%"=="15" goto uninstall
 if "%op%"=="16" goto purge
+if "%op%"=="17" goto testes
 if "%op%"=="0"  goto end
 goto menu
 
@@ -176,6 +178,12 @@ set /p "c=Tem certeza? (S/N): "
 if /I "%c%"=="S" (
   %PS% "%SCRIPTS%\uninstall.ps1" -RemoveMod -Purge
 )
+pause
+goto menu
+
+:testes
+echo.
+%PS% "%SCRIPTS%\test.ps1"
 pause
 goto menu
 
