@@ -19,7 +19,7 @@ Write-Host "Mod escolhido .... $(if ($cfg) { Get-ModRotulo $cfg } else { 'nada c
 # ---- Discord + patch ----
 if (Test-Path $discord) {
     $app         = Get-DiscordAppDir
-    $incompletas = Get-DiscordAppsIncompletos
+    $incompletas = Get-DiscordAppIncompleto
 
     if ($app) {
         Write-Host "Discord .......... instalado ($($app.Name))" -ForegroundColor Green

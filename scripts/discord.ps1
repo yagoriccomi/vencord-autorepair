@@ -47,7 +47,7 @@ function Get-DiscordAppDir {
         Select-Object -Last 1
 }
 
-function Get-DiscordAppsIncompletos {
+function Get-DiscordAppIncompleto {
     Get-ChildItem $script:DiscordDir -Directory -Filter 'app-*' -ErrorAction SilentlyContinue |
         Where-Object { -not (Test-DiscordAppCompleto $_.FullName) }
 }

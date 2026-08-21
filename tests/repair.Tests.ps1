@@ -204,7 +204,7 @@ Describe 'Request-FecharDiscord' {
 
     It 'devolve ok sem incomodar ninguem quando o Discord ja esta fechado' {
         Mock Test-DiscordRodando { $false }
-        Mock Ask-Proceed { throw 'nao deveria perguntar nada' }
+        Mock Confirm-Proceed { throw 'nao deveria perguntar nada' }
         Mock Stop-DiscordApp { throw 'nao deveria fechar nada' }
 
         Request-FecharDiscord $script:CfgAvisa 'mensagem' | Should -Be 'ok'
@@ -213,7 +213,7 @@ Describe 'Request-FecharDiscord' {
     # --- respeitar o "nao" do usuario e o que evita fechar o Discord na cara dele
     It 'devolve adiado e NAO fecha o Discord quando o usuario recusa' {
         Mock Test-DiscordRodando { $true }
-        Mock Ask-Proceed { $false }
+        Mock Confirm-Proceed { $false }
         Mock Stop-DiscordApp { throw 'nao pode fechar apos o usuario recusar' }
 
         Request-FecharDiscord $script:CfgAvisa 'mensagem' | Should -Be 'adiado'
@@ -221,7 +221,7 @@ Describe 'Request-FecharDiscord' {
 
     It 'devolve ok quando o usuario aceita e o fechamento funciona' {
         Mock Test-DiscordRodando { $true }
-        Mock Ask-Proceed { $true }
+        Mock Confirm-Proceed { $true }
         Mock Stop-DiscordApp { $true }
 
         Request-FecharDiscord $script:CfgAvisa 'mensagem' | Should -Be 'ok'
@@ -230,7 +230,7 @@ Describe 'Request-FecharDiscord' {
     # --- nao conseguiu fechar = NAO patchear (foi o que corrompia o Discord)
     It 'devolve falhou quando o Discord se recusa a fechar' {
         Mock Test-DiscordRodando { $true }
-        Mock Ask-Proceed { $true }
+        Mock Confirm-Proceed { $true }
         Mock Stop-DiscordApp { $false }
 
         Request-FecharDiscord $script:CfgAvisa 'mensagem' | Should -Be 'falhou'
@@ -238,7 +238,7 @@ Describe 'Request-FecharDiscord' {
 
     It 'nao pergunta nada quando o aviso esta desligado, mas ainda fecha' {
         Mock Test-DiscordRodando { $true }
-        Mock Ask-Proceed { throw 'aviso desligado: nao deveria perguntar' }
+        Mock Confirm-Proceed { throw 'aviso desligado: nao deveria perguntar' }
         Mock Stop-DiscordApp { $true }
         $cfgSemAviso = [pscustomobject]@{ AvisarAntesDeFechar = $false; SegundosAviso = 8 }
 

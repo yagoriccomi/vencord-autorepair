@@ -160,7 +160,7 @@ $script:MaxCiclosEstabilizar     = 120  # teto de ~10 min esperando o updater
 # Extraido porque o mesmo trio avisar/fechar/tratar aparecia em dois pontos.
 function Request-FecharDiscord($cfg, $mensagemAviso) {
     if (-not (Test-DiscordRodando)) { return 'ok' }
-    if ($cfg.AvisarAntesDeFechar -and -not (Ask-Proceed $mensagemAviso $cfg.SegundosAviso)) { return 'adiado' }
+    if ($cfg.AvisarAntesDeFechar -and -not (Confirm-Proceed $mensagemAviso $cfg.SegundosAviso)) { return 'adiado' }
     if (Stop-DiscordApp -Log $script:LogInfra) { return 'ok' }
     return 'falhou'
 }
@@ -263,7 +263,7 @@ function Invoke-Repair([string]$motivo, [bool]$forcar) {
 
     if (-not (Test-Path $discord)) { Log "Discord nao instalado."; return }
 
-    $incompletos = Get-DiscordAppsIncompletos
+    $incompletos = Get-DiscordAppIncompleto
     if ($incompletos) {
         Log "Ignorando update incompleto do Discord: $(($incompletos | ForEach-Object { $_.Name }) -join ', ')"
     }

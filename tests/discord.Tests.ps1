@@ -84,7 +84,7 @@ Describe 'Get-DiscordAppDir' {
     }
 }
 
-Describe 'Get-DiscordAppsIncompletos' {
+Describe 'Get-DiscordAppIncompleto' {
 
     BeforeEach {
         Get-ChildItem $script:FakeDiscord -Directory -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force
@@ -94,7 +94,7 @@ Describe 'Get-DiscordAppsIncompletos' {
         New-AppFalso -Versao '1.0.9251' -ComPatch | Out-Null
         New-AppFalso -Versao '1.0.9252' -SemAsar  | Out-Null
 
-        $inc = @(Get-DiscordAppsIncompletos)
+        $inc = @(Get-DiscordAppIncompleto)
         $inc.Count      | Should -Be 1
         $inc[0].Name    | Should -Be 'app-1.0.9252'
     }
@@ -102,7 +102,7 @@ Describe 'Get-DiscordAppsIncompletos' {
     It 'devolve vazio quando todas as pastas estao completas' {
         New-AppFalso -Versao '1.0.9251' -ComPatch | Out-Null
 
-        @(Get-DiscordAppsIncompletos).Count | Should -Be 0
+        @(Get-DiscordAppIncompleto).Count | Should -Be 0
     }
 }
 

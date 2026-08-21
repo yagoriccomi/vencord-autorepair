@@ -36,7 +36,7 @@ function Show-Box($titulo, $mensagem, $erro, $segundos) {
 
 # Pergunta Sim/Nao com contagem regressiva. Sem resposta = segue em frente,
 # para o auto-reparo nao ficar travado esperando alguem que saiu da frente do PC.
-function Ask-Proceed($mensagem, $segundos) {
+function Confirm-Proceed($mensagem, $segundos) {
     try {
         $wsh = New-Object -ComObject WScript.Shell
         $r = $wsh.Popup($mensagem, $segundos, $script:TituloApp, $script:BotoesSimNao)
