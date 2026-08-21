@@ -1,0 +1,69 @@
+name: CI
+
+# Este projeto nao tem deploy: e um utilitario que roda na maquina do usuario.
+# Entao a esteira e so PORTAO DE QUALIDADE - analise estatica e testes. O
+# objetivo e que as correcoes da auditoria (REVIEW.md) nao regridam em silencio.
+#
+# Custo: repositorio privado + runner Windows consome minutos com multiplicador
+# 2x. Por isso commits que so mexem em documentacao nao disparam a esteira.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  pull_request:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+# Um push novo cancela a execucao anterior da mesma referencia, para nao
+# queimar cota com builds que ja nasceram obsoletos.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    # windows-latest e OBRIGATORIO: o codigo usa Windows PowerShell 5.1, mutex
+    # nomeado do Win32, Get-ScheduledTask e VBScript. Runner Linux nao roda isto.
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sem cache, instalar Pester + PSScriptAnalyzer da galeria leva ~1 min a
+      # cada execucao - que aqui custa o dobro por ser Windows.
+      - name: Cache dos modulos do PowerShell
+        uses: actions/cache@v4
+        with:
+          path: ~\Documents\WindowsPowerShell\Modules
+          key: ps-modules-${{ runner.os }}-pester5-psa1
+
+      - name: Instalar Pester 5+ e PSScriptAnalyzer
+        shell: powershell
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          if (-not (Get-Module -ListAvailable Pester | Where-Object { $_.Version -ge [version]'5.0.0' })) {
+            Install-Module Pester -Scope CurrentUser -Force -SkipPublisherCheck -MinimumVersion 5.0.0
+          }
+          if (-not (Get-Module -ListAvailable PSScriptAnalyzer)) {
+            Install-Module PSScriptAnalyzer -Scope CurrentUser -Force
+          }
+
+      - name: Analise estatica (PSScriptAnalyzer)
+        shell: powershell
+        run: |
+          $achados = Invoke-ScriptAnalyzer -Path . -Recurse -Settings .\PSScriptAnalyzerSettings.psd1
+          if ($achados) {
+            $achados | Format-Table RuleName, Severity, ScriptName, Line, Message -AutoSize | Out-String -Width 200
+            Write-Host "::error::$($achados.Count) achado(s) de analise estatica."
+            exit 1
+          }
+          Write-Host "Analise estatica limpa."
+
+      # scripts/test.ps1 ja sai com codigo != 0 quando algum teste falha,
+      # entao ele proprio e o gate. Codigo que nao passa nao segue [#49].
+      - name: Testes (Pester)
+        shell: powershell
+        run: .\scripts\test.ps1
