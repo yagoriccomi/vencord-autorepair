@@ -24,7 +24,7 @@ Todos os achados de Crítico a Baixo foram corrigidos e **verificados na prátic
 | 1 | Binário executado sem checksum no caminho automático | **Corrigido** | Adulterei 1 byte do instalador: o vigia **recusou executá-lo** e não tocou no Discord |
 | 2 | Cópia de 16 MB não atômica | **Corrigido** | Temporário + `Move-Item`; teste garante que a falha **preserva** o build anterior |
 | 3 | `SilentlyContinue` global | **Corrigido** | Trocado por `Stop` + falha contida que avisa em vez de engolir |
-| 4 | Sem CI | Em andamento | Etapa 4/5 do roadmap |
+| 4 | Sem CI | **Corrigido** | GitHub Actions verde na 1ª execução (52 s): lint + 64 testes como gate |
 | 5 | Log sem rotação / cabeçalhos defasados | **Corrigido** | Rotação em 1 MB; três cabeçalhos padronizados |
 
 **O que a correção nº 3 revelou de imediato:** ao ligar o `Stop`, o ciclo real quebrou na hora. O PowerShell 5.1 embrulha **cada linha de stderr de um `.exe`** num `ErrorRecord` — e o instalador escreve `INFO Patching...` no stderr. Ou seja, sob `Stop`, um patch **bem-sucedido** virava erro terminante. Resolvido com um executor dedicado (`Invoke-Instalador`) que isola essa captura, deixando o sucesso ser decidido pelo exit code e pela conferência dos arquivos — nunca pelo stream de erro. Suíte: **64 testes**, todos passando.
@@ -84,9 +84,9 @@ O único dado pessoal presente é o **nome de usuário do Windows**, embutido no
 * **Impacto:** sobrescrita de arquivo arbitrário / execução de script arbitrário a partir de um arquivo de configuração adulterado.
 * **Solução:** validar que `AsarDoMod` termina em `.asar` e reside sob `%APPDATA%`, e que `BuildPersonalizado` existe e é arquivo — rejeitando com aviso em vez de obedecer cegamente.
 
-* **[Sem CI: os 58 testes não são gate de nada]**: a suíte existe e passa, mas nada a executa automaticamente. Um commit que quebre a base só é descoberto na próxima falha real, na máquina do usuário [#49][#76].
-* **Impacto:** a rede de proteção recém-construída depende de alguém lembrar de rodá-la.
-* **Solução:** já é a **etapa 4/5** do roadmap em andamento (GitHub Actions com PSScriptAnalyzer + Pester).
+* **[Sem CI: os testes não eram gate de nada]** — ✅ **RESOLVIDO**: a suíte existia e passava, mas nada a executava automaticamente. Um commit que quebrasse a base só apareceria na próxima falha real, na máquina do usuário [#49][#76].
+* **Impacto:** a rede de proteção dependia de alguém lembrar de rodá-la.
+* **Solução aplicada:** `.github/workflows/ci.yml` — PSScriptAnalyzer + Pester como gate em `windows-latest`. Verificado: **verde na primeira execução**, 52 s, 64 testes. Sem deploy e sem secrets (não há o que implantar).
 
 ---
 
@@ -109,8 +109,14 @@ O único dado pessoal presente é o **nome de usuário do Windows**, embutido no
 1. **Verificar o checksum antes de TODA execução do instalador**, não só na instalação manual (`repair.ps1`, `uninstall.ps1`). É o único achado crítico e o de correção mais barata. *(Risco Crítico)*
 2. **Tornar atômica a troca do `.asar`** (temporário + `Move-Item`), eliminando a janela em que uma cópia interrompida quebra o Discord. *(Risco Alto)*
 3. **Substituir o `SilentlyContinue` global** por `Stop` + `try/catch` nos pontos que legitimamente falham, para o reparo parar de decidir sobre estado que falhou em silêncio. *(Risco Alto)*
-4. **Concluir a etapa de CI** para que os 58 testes virem gate real de cada push. *(Risco Médio — já em andamento)*
-5. **Rotacionar o log** e padronizar os três cabeçalhos defasados. *(Médio / Baixo — higiene)*
+4. ~~**Concluir a etapa de CI**~~ — ✅ feito: 64 testes viraram gate real de cada push.
+5. ~~**Rotacionar o log** e padronizar os cabeçalhos defasados~~ — ✅ feito.
+
+### 📌 Pendência aberta (não urgente)
+
+* **[Ações do CI usando Node 20, que está sendo descontinuado]**: o GitHub anotou na execução que `actions/checkout@v4` e `actions/cache@v4` têm como alvo o Node 20, já depreciado. **Não quebra hoje** — o runner as força a rodar em Node 24 —, mas vai parar de funcionar quando o suporte sair de vez [#62].
+* **Onde está:** `.github/workflows/ci.yml`, passos `actions/checkout@v4` e `actions/cache@v4`.
+* **Como corrigir:** subir as duas para `@v5`. São duas linhas. Deixado para a próxima alteração do projeto em vez de um push só para isso, porque cada execução consome cota de CI e o risco atual é zero.
 
 ---
 
