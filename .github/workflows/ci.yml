@@ -30,12 +30,12 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Sem cache, instalar Pester + PSScriptAnalyzer da galeria leva ~1 min a
       # cada execucao - que aqui custa o dobro por ser Windows.
       - name: Cache dos modulos do PowerShell
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~\Documents\WindowsPowerShell\Modules
           key: ps-modules-${{ runner.os }}-pester5-psa1

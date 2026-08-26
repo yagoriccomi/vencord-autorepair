@@ -23,8 +23,8 @@ $script:FolgaArquivosSegundos   = 2   # o Windows ainda segura os arquivos um in
 $script:EsperaUpdaterSegundos   = 12
 $script:EsperaDiretoSegundos    = 15
 
-function Write-Passo($Log, $mensagem) {
-    if ($Log) { & $Log $mensagem }
+function Write-Passo($Reportar, $mensagem) {
+    if ($Reportar) { & $Reportar $mensagem }
 }
 
 # ------------------------------------------------------------ versoes ----
@@ -73,11 +73,11 @@ function Test-DiscordRodando {
 # com ele aberto o instalador recusa ("files are used by a different process")
 # e pode deixar o Discord quebrado.
 function Stop-DiscordApp {
-    param([scriptblock]$Log)
+    param([scriptblock]$Reportar)
 
     if (-not (Test-DiscordRodando)) { return $true }
 
-    Write-Passo $Log "Fechando o Discord para liberar os arquivos..."
+    Write-Passo $Reportar "Fechando o Discord para liberar os arquivos..."
     Get-Process Discord -ErrorAction SilentlyContinue | ForEach-Object { $null = $_.CloseMainWindow() }
 
     for ($i = 0; $i -lt $script:EsperaFecharSegundos; $i++) {
@@ -86,7 +86,7 @@ function Stop-DiscordApp {
     }
 
     if (Test-DiscordRodando) {
-        Write-Passo $Log "Discord foi para a bandeja - encerrando o processo."
+        Write-Passo $Reportar "Discord foi para a bandeja - encerrando o processo."
         Get-Process Discord -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds $script:EsperaPosKillSegundos
     }
@@ -97,7 +97,7 @@ function Stop-DiscordApp {
 
 # Abre o Discord e CONFERE se subiu mesmo, com plano B.
 function Start-DiscordApp {
-    param([scriptblock]$Log)
+    param([scriptblock]$Reportar)
 
     if (Test-DiscordRodando) { return $true }
 
@@ -106,9 +106,9 @@ function Start-DiscordApp {
         Start-Process $script:DiscordUpdater -ArgumentList '--processStart', 'Discord.exe'
         for ($i = 0; $i -lt $script:EsperaUpdaterSegundos; $i++) {
             Start-Sleep -Seconds 1
-            if (Test-DiscordRodando) { Write-Passo $Log "Discord reaberto."; return $true }
+            if (Test-DiscordRodando) { Write-Passo $Reportar "Discord reaberto."; return $true }
         }
-        Write-Passo $Log "Update.exe nao subiu o Discord - tentando abrir direto."
+        Write-Passo $Reportar "Update.exe nao subiu o Discord - tentando abrir direto."
     }
 
     # 2) plano B: executavel da versao mais nova (ignorando updates pela metade)
@@ -119,11 +119,11 @@ function Start-DiscordApp {
             Start-Process $bin
             for ($i = 0; $i -lt $script:EsperaDiretoSegundos; $i++) {
                 Start-Sleep -Seconds 1
-                if (Test-DiscordRodando) { Write-Passo $Log "Discord reaberto (direto)."; return $true }
+                if (Test-DiscordRodando) { Write-Passo $Reportar "Discord reaberto (direto)."; return $true }
             }
         }
     }
 
-    Write-Passo $Log "NAO consegui reabrir o Discord."
+    Write-Passo $Reportar "NAO consegui reabrir o Discord."
     return $false
 }

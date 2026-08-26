@@ -12,7 +12,7 @@ if (-not (Test-Path $script:DiscordDir)) {
 }
 
 Write-Host "Abrindo o Discord..." -ForegroundColor Yellow
-if (Start-DiscordApp -Log { param($m) Write-Host "  $m" -ForegroundColor DarkGray }) {
+if (Start-DiscordApp -Reportar { param($m) Write-Host "  $m" -ForegroundColor DarkGray }) {
     Write-Host "Discord aberto." -ForegroundColor Green
 } else {
     Write-Host "Nao consegui abrir o Discord." -ForegroundColor Red

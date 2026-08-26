@@ -34,7 +34,7 @@ if ($RemoveMod) {
     # O instalador FALHA com o Discord aberto - fechar antes e obrigatorio.
     $estavaAberto = Test-DiscordRodando
     if ($estavaAberto) {
-        Stop-DiscordApp -Log { param($m) Write-Host $m -ForegroundColor Yellow } | Out-Null
+        Stop-DiscordApp -Reportar { param($m) Write-Host $m -ForegroundColor Yellow } | Out-Null
     }
 
     # Usa qualquer instalador presente - serve tanto para Vencord quanto Equicord
@@ -58,7 +58,7 @@ if ($RemoveMod) {
     }
 
     if ($estavaAberto) {
-        Start-DiscordApp -Log { param($m) Write-Host $m -ForegroundColor Green } | Out-Null
+        Start-DiscordApp -Reportar { param($m) Write-Host $m -ForegroundColor Green } | Out-Null
     }
 }
 

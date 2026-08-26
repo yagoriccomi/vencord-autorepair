@@ -78,6 +78,15 @@ usuário. Elas parecem cerimônia desnecessária até você desfazer uma.
     'Continue'`.** O PowerShell 5.1 embrulha **cada linha de stderr de um
     `.exe`** num `ErrorRecord`; sob `'Stop'`, um patch **bem-sucedido** virava
     erro terminante, porque o instalador escreve `INFO ...` em stderr.
+11. **O caminho do log é `$script:ArquivoLog`, com escopo explícito.** Variável
+    em PowerShell é **case-insensitive** e a busca **sobe pela cadeia de
+    chamadas**: enquanto o caminho se chamava `$log`, ele colidia com o
+    parâmetro `$Log` da camada de infra. A função `Log`, chamada de dentro de
+    `Stop-DiscordApp`, encontrava o **scriptblock** em vez do caminho e tentava
+    gravar num arquivo chamado `" param($m) Log $m"` — relativo ao diretório da
+    tarefa agendada (`system32`). Resultado: *acesso negado*, reparo abortado e
+    Discord sem mod. Por isso o parâmetro hoje se chama **`-Reportar`**, e não
+    `-Log`. **Não renomeie de volta.**
 
 ## 🧪 Testes
 
@@ -126,9 +135,9 @@ linhas sem urgência gasta o mesmo que uma entrega de verdade.
 > Commit que só toca `.md` **não** dispara o CI (`paths-ignore`), então
 > documentação pode ser commitada à vontade.
 
-**Pendência aberta hoje:** `actions/checkout@v4` e `actions/cache@v4` usam
-Node 20 (depreciado). Não quebra agora — o runner força Node 24. Subir para
-`@v5` junto da próxima mudança em `.github/` ou em `scripts/`.
+**Pendência aberta hoje:** nenhuma. *(A do Node 20 nas actions foi resolvida em
+25/08, pegando carona na correção da colisão de variável — exatamente como esta
+convenção prevê.)*
 
 ## 📋 Convenções
 

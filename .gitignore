@@ -5,7 +5,9 @@
 *.log
 register-result.txt
 
-# Lixo de redirecionamento de shell mal formado (ja aconteceu 2x)
+# Rede de seguranca: um bug de colisao de variavel ( x ) criava um
+# arquivo com nome de scriptblock. A causa foi corrigida em 25/08; a regra fica
+# como protecao barata caso algo parecido reapareca.
 * param(*
 
 # Artefatos de sessao/ferramenta

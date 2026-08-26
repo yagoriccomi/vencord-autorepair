@@ -55,7 +55,7 @@ Write-Host "Checksum OK." -ForegroundColor Green
 # ("files are used by a different process") e pode deixar tudo quebrado.
 $estavaAberto = Test-DiscordRodando
 if ($estavaAberto) {
-    Stop-DiscordApp -Log { param($m) Write-Host $m -ForegroundColor Yellow } | Out-Null
+    Stop-DiscordApp -Reportar { param($m) Write-Host $m -ForegroundColor Yellow } | Out-Null
 }
 
 # Aplica o mod (se houver outro aplicado, o instalador desfaz antes)
@@ -99,7 +99,7 @@ if ($aplicado) {
 
 # Reabre o Discord se ele estava aberto antes (conferindo se subiu mesmo)
 if ($estavaAberto) {
-    if (Start-DiscordApp -Log { param($m) Write-Host $m -ForegroundColor DarkGray }) {
+    if (Start-DiscordApp -Reportar { param($m) Write-Host $m -ForegroundColor DarkGray }) {
         Write-Host "Discord reaberto." -ForegroundColor Green
     } else {
         Write-Host "Nao consegui reabrir o Discord - abra manualmente." -ForegroundColor Yellow

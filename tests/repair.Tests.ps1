@@ -246,6 +246,40 @@ Describe 'Request-FecharDiscord' {
     }
 }
 
+Describe 'Log' {
+    # REGRESSAO REAL (25/08/2026): a funcao Log usava a variavel $log para o
+    # caminho do arquivo. A camada de infra recebia um parametro chamado $Log
+    # (o scriptblock de reporte). Como variavel em PowerShell e
+    # case-insensitive e a busca sobe pela cadeia de chamadas, ao ser invocada
+    # de dentro de Stop-DiscordApp a funcao encontrava o SCRIPTBLOCK em vez do
+    # caminho - e tentava escrever num arquivo chamado " param($m) Log $m",
+    # relativo ao diretorio da tarefa agendada (system32). Resultado: acesso
+    # negado e o reparo abortado, com o Discord ficando sem o mod.
+
+    It 'escreve no arquivo certo mesmo chamada de dentro de funcao com $Log em escopo' {
+        function Invoke-CamadaFalsa {
+            param([scriptblock]$Log)   # exatamente o nome que causava a colisao
+            & $Log 'mensagem vinda da camada de infra'
+        }
+
+        Invoke-CamadaFalsa -Log $script:LogInfra
+
+        Test-Path $script:ArquivoLog | Should -BeTrue
+        (Get-Content $script:ArquivoLog -Raw) | Should -Match 'mensagem vinda da camada de infra'
+    }
+
+    It 'nao cria arquivo com nome de scriptblock no diretorio atual' {
+        function Invoke-CamadaFalsa2 {
+            param([scriptblock]$Log)
+            & $Log 'outra mensagem'
+        }
+
+        Invoke-CamadaFalsa2 -Log $script:LogInfra
+
+        @(Get-ChildItem -Path . -Filter '*param(*' -ErrorAction SilentlyContinue).Count | Should -Be 0
+    }
+}
+
 Describe 'Invoke-ComTravaDeOperacao' {
     # REGRESSAO: em producao, um reparo manual (-Once) e um automatico (vigia)
     # rodaram o instalador nos MESMOS arquivos com 2s de diferenca. O mutex do

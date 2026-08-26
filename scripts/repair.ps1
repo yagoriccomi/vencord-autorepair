@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 
 $base    = "$env:USERPROFILE\DiscordModAutoRepair"
 $discord = "$env:LOCALAPPDATA\Discord"
-$log     = "$base\watch.log"
+$script:ArquivoLog     = "$base\watch.log"
 $cfgFile = "$base\config.json"
 $stFile  = "$base\state.json"
 
@@ -27,11 +27,11 @@ $script:LogMaxBytes = 1MB
 # e ficaria inutil justamente para diagnosticar.
 function Log($m) {
     try {
-        if ((Test-Path $log) -and (Get-Item $log).Length -gt $script:LogMaxBytes) {
-            Move-Item $log "$log.1" -Force -ErrorAction SilentlyContinue
+        if ((Test-Path $script:ArquivoLog) -and (Get-Item $script:ArquivoLog).Length -gt $script:LogMaxBytes) {
+            Move-Item $script:ArquivoLog "$script:ArquivoLog.1" -Force -ErrorAction SilentlyContinue
         }
     } catch { }
-    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Out-File -FilePath $log -Append -Encoding utf8
+    "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')  $m" | Out-File -FilePath $script:ArquivoLog -Append -Encoding utf8
 }
 
 # A camada de acesso ao Discord nao conhece o nosso log: recebe este
@@ -161,7 +161,7 @@ $script:MaxCiclosEstabilizar     = 120  # teto de ~10 min esperando o updater
 function Request-FecharDiscord($cfg, $mensagemAviso) {
     if (-not (Test-DiscordRodando)) { return 'ok' }
     if ($cfg.AvisarAntesDeFechar -and -not (Confirm-Proceed $mensagemAviso $cfg.SegundosAviso)) { return 'adiado' }
-    if (Stop-DiscordApp -Log $script:LogInfra) { return 'ok' }
+    if (Stop-DiscordApp -Reportar $script:LogInfra) { return 'ok' }
     return 'falhou'
 }
 
@@ -301,7 +301,7 @@ function Invoke-Repair([string]$motivo, [bool]$forcar) {
         }
 
         $reposto = Restore-CustomBuild $cfg $info
-        if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Log $script:LogInfra }
+        if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Reportar $script:LogInfra }
         if ($reposto) {
             if ($cfg.NotificarSucesso) {
                 Show-Box "Discord Mod Auto-Repair" `
@@ -393,7 +393,7 @@ function Invoke-Repair([string]$motivo, [bool]$forcar) {
                  "Reconstrua o build (menu, opcao 13) e use a opcao 6.") $true 0
         }
 
-        if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Log $script:LogInfra }
+        if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Reportar $script:LogInfra }
         if ($cfg.NotificarSucesso -and -not $buildFalhou) {
             Show-Box "Discord Mod Auto-Repair" `
                 ("$nome aplicado com sucesso!" + [char]10 + [char]10 +
@@ -412,7 +412,7 @@ function Invoke-Repair([string]$motivo, [bool]$forcar) {
     $estado2 = if ($app) { Get-DiscordPatchState $app } else { 'desconhecido' }
     Log "Estado depois da limpeza: $estado2"
 
-    if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Log $script:LogInfra }
+    if ($cfg.ReabrirDiscord) { $null = Start-DiscordApp -Reportar $script:LogInfra }
 
     $extra = ''
     if ([int]$st.Falhas -ge [int]$cfg.MaxTentativas) {

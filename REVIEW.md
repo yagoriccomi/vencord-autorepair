@@ -112,11 +112,19 @@ O único dado pessoal presente é o **nome de usuário do Windows**, embutido no
 4. ~~**Concluir a etapa de CI**~~ — ✅ feito: 64 testes viraram gate real de cada push.
 5. ~~**Rotacionar o log** e padronizar os cabeçalhos defasados~~ — ✅ feito.
 
-### 📌 Pendência aberta (não urgente)
+### 📌 Pendências abertas
 
-* **[Ações do CI usando Node 20, que está sendo descontinuado]**: o GitHub anotou na execução que `actions/checkout@v4` e `actions/cache@v4` têm como alvo o Node 20, já depreciado. **Não quebra hoje** — o runner as força a rodar em Node 24 —, mas vai parar de funcionar quando o suporte sair de vez [#62].
-* **Onde está:** `.github/workflows/ci.yml`, passos `actions/checkout@v4` e `actions/cache@v4`.
-* **Como corrigir:** subir as duas para `@v5`. São duas linhas. Deixado para a próxima alteração do projeto em vez de um push só para isso, porque cada execução consome cota de CI e o risco atual é zero.
+* Nenhuma. ~~Ações do CI usando Node 20~~ — ✅ resolvido em 25/08, subindo `actions/checkout` e `actions/cache` para `@v5`, de carona na correção da colisão de variável [#62].
+
+---
+
+## 🔄 Achado posterior à auditoria (25/08/2026)
+
+* **[Colisão de variável derrubou o auto-reparo em produção]**: a função `Log` gravava em `$log`. A camada de infra recebia um parâmetro chamado `$Log` (o scriptblock de reporte). Como variável em PowerShell é **case-insensitive** e a resolução **sobe pela cadeia de chamadas**, `Log` — invocada de dentro de `Stop-DiscordApp` — encontrava o **scriptblock** no lugar do caminho. O destino virou `" param($m) Log $m"`, relativo ao diretório da tarefa agendada (`C:\WINDOWS\system32`): **acesso negado**, reparo abortado, Discord atualizado e sem o mod [#1].
+* **Onde estava:** `scripts/repair.ps1` (função `Log`) × `scripts/discord.ps1` (`param([scriptblock]$Log)`).
+* **Correção:** o caminho passou a ser `$script:ArquivoLog` (escopo explícito, nome inconfundível) e o parâmetro virou `-Reportar`. Dois testes de regressão cobrem o caso, inclusive o de não criar arquivo com nome de scriptblock no diretório atual.
+* **Como apareceu:** aquele arquivo estranho que surgia no repositório e que eu havia diagnosticado como resíduo de shell — **era este bug**, escrevendo relativo ao diretório de trabalho. A regra no `.gitignore` estava tratando sintoma.
+* **O que funcionou:** a contenção de erro adicionada na etapa 3.5 capturou a exceção, avisou o usuário na tela com data, hora e caminho, e **não derrubou o vigia**.
 
 ---
 
